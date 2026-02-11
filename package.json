@@ -1,0 +1,28 @@
+{
+  "name": "paridhan-backend",
+  "version": "1.0.0",
+  "description": "this is backend of paridhan emporium",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "seed": "node src/seed.js",
+    "seed:destroy": "node src/seed.js --destroy",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Vaibhav Pandey",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.1.5",
+    "morgan": "^1.10.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
+  }
+}
