@@ -1,6 +1,9 @@
+import mongoose from "mongoose";
 import Cart from "../../models/Cart.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
+import { calculateCartTotals } from "../../services/pricingService.js";
+import { decrementStockForLine } from "../../services/orderInventoryService.js";
 
 export const createOrder = async (req, res) => {
   try {
@@ -38,44 +41,83 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const orderItems = cart.items.map((item) => ({
-      productId: item.product,
-      name: item.name,
-      image: item.image,
-      price: item.price,
-      mrp: item.mrp,
-      quantity: item.quantity,
-      subtotal: item.subtotal,
-      seller: item.seller
-    }));
-
-    const order = await Order.create({
-      user: req.user._id,
-      orderNumber: `ORD-${Date.now()}`,
-      items: orderItems,
-      shippingAddress: {
-        fullName: address.fullName,
-        phone: address.phone,
-        street: address.street,
-        city: address.city,
-        state: address.state,
-        postalCode: address.postalCode,
-        country: address.country
-      },
-      itemsTotal: cart.itemsTotal,
-      taxAmount: cart.taxAmount,
-      deliveryCharge: cart.deliveryCharge,
-      grandTotal: cart.grandTotal,
-      paymentMethod
+    const orderItems = cart.items.map((item) => {
+      const row = {
+        productId: item.product,
+        name: item.name,
+        image: item.image,
+        price: item.price,
+        mrp: item.mrp,
+        quantity: item.quantity,
+        subtotal: item.subtotal,
+        seller: item.seller
+      };
+      if (item.variantPublicId) {
+        row.variantPublicId = item.variantPublicId;
+        row.variantLabel = item.variantLabel;
+      }
+      return row;
     });
+    const totals = calculateCartTotals(orderItems);
 
-    await Cart.findOneAndDelete({ user: req.user._id });
+    const session = await mongoose.startSession();
+    let createdOrder = null;
 
-    return res.status(200).json({
-      success: true,
-      message: "Order placed successfully",
-      data: order
-    });
+    try {
+      await session.withTransaction(async () => {
+        for (const line of cart.items) {
+          const ok = await decrementStockForLine(line, session);
+          if (!ok) {
+            throw Object.assign(new Error("INSUFFICIENT_STOCK"), { code: "INSUFFICIENT_STOCK" });
+          }
+        }
+
+        const [orderDoc] = await Order.create(
+          [
+            {
+              user: req.user._id,
+              orderNumber: `ORD-${Date.now()}`,
+              items: orderItems,
+              shippingAddress: {
+                fullName: address.fullName,
+                phone: address.phone,
+                street: address.street,
+                city: address.city,
+                state: address.state,
+                postalCode: address.postalCode,
+                country: address.country
+              },
+              itemsTotal: totals.itemsTotal,
+              taxAmount: totals.taxAmount,
+              deliveryCharge: totals.deliveryCharge,
+              grandTotal: totals.grandTotal,
+              paymentMethod
+            }
+          ],
+          { session }
+        );
+
+        createdOrder = orderDoc;
+        await Cart.deleteOne({ user: req.user._id }).session(session);
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Order placed successfully",
+        data: createdOrder
+      });
+    } catch (err) {
+      if (err?.code === "INSUFFICIENT_STOCK") {
+        return res.status(200).json({
+          success: false,
+          message: "Insufficient stock for one or more items",
+          data: null
+        });
+      }
+      throw err;
+    } finally {
+      await session.endSession();
+    }
   } catch (error) {
     return res.status(500).json({
       success: false,

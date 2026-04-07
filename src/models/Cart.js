@@ -38,6 +38,16 @@ const cartItemSchema = new mongoose.Schema(
     subtotal: {
       type: Number,
       required: true
+    },
+
+    variantPublicId: {
+      type: String,
+      trim: true
+    },
+
+    variantLabel: {
+      type: String,
+      trim: true
     }
   },
   { _id: false }

@@ -1,10 +1,12 @@
 
 export const getMyProfile = async (req, res) => {
   try {
+    const data = req.user.toObject ? req.user.toObject() : req.user;
+    data.activeRole = req.auth?.activeRole || req.user.role;
     return res.status(200).json({
       success: true,
       message: "Profile fetched successfully",
-      data: req.user
+      data
     });
   } catch (error) {
     return res.status(500).json({

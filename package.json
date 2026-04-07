@@ -9,15 +9,17 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/seed.js",
     "seed:destroy": "node src/seed.js --destroy",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node src/tests/role-cart-checkout.integration.js"
   },
   "author": "Vaibhav Pandey",
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.5",
     "morgan": "^1.10.1"

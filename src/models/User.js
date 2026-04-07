@@ -55,6 +55,11 @@ const userSchema = new mongoose.Schema(
       enum: ["customer", "admin", "staff", "seller"],
       default: "customer",
     },
+    roles: {
+      type: [String],
+      enum: ["customer", "admin", "staff", "seller"],
+      default: ["customer"],
+    },
 
     // ================= PROFILE =================
     avatar: {
@@ -103,6 +108,22 @@ userSchema.pre("save", async function () {
 
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Keep backwards compatibility while migrating from single-role to multi-role users.
+userSchema.pre("validate", function () {
+  if ((!this.roles || this.roles.length === 0) && this.role) {
+    this.roles = [this.role];
+  }
+  if (this.roles && this.roles.length > 0) {
+    if (this.role && !this.roles.includes(this.role)) {
+      this.roles.push(this.role);
+    }
+    this.roles = Array.from(new Set(this.roles));
+  }
+  if (!this.role && this.roles?.length) {
+    this.role = this.roles[0];
+  }
 });
 
 // ================= PASSWORD MATCH =================

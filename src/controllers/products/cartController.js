@@ -1,11 +1,34 @@
 import Cart from "../../models/Cart.js";
 import Product from "../../models/Product.js";
+import { calculateCartTotals } from "../../services/pricingService.js";
+import {
+  effectiveImages,
+  getEffectiveVariantPrice,
+  hasVariants,
+  resolveVariant,
+  variantLabel,
+} from "../../services/productVariantHelpers.js";
+
+const toPublicCart = (cart) => ({
+  ...cart.toObject(),
+  items: cart.items.map((item) => ({
+    ...item.toObject(),
+    productId: item.product?.publicId || null,
+    productSlug: item.product?.slug || null,
+  })),
+});
+
+function sameCartLine(a, b) {
+  const va = a.variantPublicId || "";
+  const vb = b.variantPublicId || "";
+  return a.product.toString() === b.product.toString() && va === vb;
+}
 
 export const getCart = async (req, res) => {
   try {
     let cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product",
-      "slug isActive stock"
+      "publicId slug isActive stock variants price mrp images name"
     );
 
     if (!cart) {
@@ -25,7 +48,7 @@ export const getCart = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Cart fetched successfully",
-      data: cart
+      data: toPublicCart(cart)
     });
   } catch (error) {
     return res.status(500).json({
@@ -39,7 +62,7 @@ export const getCart = async (req, res) => {
 
 export const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1 } = req.body;
+    const { productId, quantity = 1, variantPublicId: bodyVariantId } = req.body;
 
     if (!productId) {
       return res.status(200).json({
@@ -49,7 +72,16 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    const product = await Product.findById(productId);
+    const parsedQuantity = Number(quantity);
+    if (!Number.isInteger(parsedQuantity) || parsedQuantity < 1 || parsedQuantity > 50) {
+      return res.status(200).json({
+        success: false,
+        message: "Quantity must be an integer between 1 and 50",
+        data: null
+      });
+    }
+
+    const product = await Product.findOne({ publicId: productId });
 
     if (!product || !product.isActive) {
       return res.status(200).json({
@@ -59,13 +91,37 @@ export const addToCart = async (req, res) => {
       });
     }
 
-    if (product.stock < quantity) {
+    const variantPublicId = bodyVariantId ? String(bodyVariantId).trim() : "";
+
+    if (hasVariants(product)) {
+      if (!variantPublicId) {
+        return res.status(200).json({
+          success: false,
+          message: "Variant is required for this product",
+          data: null
+        });
+      }
+    }
+
+    const variant = hasVariants(product)
+      ? resolveVariant(product, variantPublicId)
+      : null;
+
+    if (hasVariants(product) && !variant) {
       return res.status(200).json({
         success: false,
-        message: "Insufficient stock",
+        message: "Selected variant is not available",
         data: null
       });
     }
+
+    const { price, mrp } = getEffectiveVariantPrice(variant, product);
+    const imgs = effectiveImages(product, variant);
+    const image = imgs[0]?.url || "";
+    const vLabel = variant ? variantLabel(variant) : "";
+    const stockAvailable = hasVariants(product)
+      ? Number(variant.stock) || 0
+      : Number(product.stock) || 0;
 
     let cart = await Cart.findOne({ user: req.user._id });
 
@@ -73,44 +129,60 @@ export const addToCart = async (req, res) => {
       cart = new Cart({ user: req.user._id, items: [] });
     }
 
-    const itemIndex = cart.items.findIndex(
-      (i) => i.product.toString() === productId
+    const lineProbe = {
+      product: product._id,
+      variantPublicId: variantPublicId || undefined,
+    };
+
+    const itemIndex = cart.items.findIndex((i) =>
+      sameCartLine(i, lineProbe)
     );
 
     if (itemIndex > -1) {
-      cart.items[itemIndex].quantity += quantity;
+      const nextQuantity = cart.items[itemIndex].quantity + parsedQuantity;
+      if (stockAvailable < nextQuantity) {
+        return res.status(200).json({
+          success: false,
+          message: "Insufficient stock",
+          data: null
+        });
+      }
+      cart.items[itemIndex].quantity = nextQuantity;
       cart.items[itemIndex].subtotal =
         cart.items[itemIndex].price * cart.items[itemIndex].quantity;
     } else {
-      cart.items.push({
+      if (stockAvailable < parsedQuantity) {
+        return res.status(200).json({
+          success: false,
+          message: "Insufficient stock",
+          data: null
+        });
+      }
+      const newItem = {
         product: product._id,
         seller: product.seller,
         name: product.name,
-        image: product.images?.[0]?.url || "",
-        price: product.price,
-        mrp: product.mrp,
-        quantity,
-        subtotal: product.price * quantity
-      });
+        image,
+        price,
+        mrp: mrp ?? product.mrp,
+        quantity: parsedQuantity,
+        subtotal: price * parsedQuantity
+      };
+      if (variantPublicId) {
+        newItem.variantPublicId = variantPublicId;
+        newItem.variantLabel = vLabel;
+      }
+      cart.items.push(newItem);
     }
 
-    // ================= RECALCULATE TOTALS =================
-    cart.itemsTotal = cart.items.reduce(
-      (sum, item) => sum + item.subtotal,
-      0
-    );
-
-    cart.taxAmount = Math.round(cart.itemsTotal * 0.05);
-    cart.deliveryCharge = cart.itemsTotal >= 999 ? 0 : 80;
-    cart.grandTotal =
-      cart.itemsTotal + cart.taxAmount + cart.deliveryCharge;
+    Object.assign(cart, calculateCartTotals(cart.items));
 
     await cart.save();
 
     return res.status(200).json({
       success: true,
       message: "Cart updated successfully",
-      data: cart
+      data: toPublicCart(cart)
     });
   } catch (error) {
     return res.status(500).json({
@@ -125,6 +197,18 @@ export const addToCart = async (req, res) => {
 export const removeFromCart = async (req, res) => {
   try {
     const { productId } = req.params;
+    const variantPublicId = req.query.variantPublicId
+      ? String(req.query.variantPublicId).trim()
+      : "";
+
+    const product = await Product.findOne({ publicId: productId }).select("_id");
+    if (!product) {
+      return res.status(200).json({
+        success: false,
+        message: "Product not found",
+        data: null
+      });
+    }
 
     const cart = await Cart.findOne({ user: req.user._id });
 
@@ -136,11 +220,14 @@ export const removeFromCart = async (req, res) => {
       });
     }
 
+    const lineProbe = {
+      product: product._id,
+      variantPublicId: variantPublicId || undefined,
+    };
+
     const initialLength = cart.items.length;
 
-    cart.items = cart.items.filter(
-      (item) => item.product.toString() !== productId
-    );
+    cart.items = cart.items.filter((item) => !sameCartLine(item, lineProbe));
 
     if (cart.items.length === initialLength) {
       return res.status(200).json({
@@ -150,22 +237,14 @@ export const removeFromCart = async (req, res) => {
       });
     }
 
-    cart.itemsTotal = cart.items.reduce(
-      (sum, item) => sum + item.subtotal,
-      0
-    );
-
-    cart.taxAmount = Math.round(cart.itemsTotal * 0.05);
-    cart.deliveryCharge = cart.itemsTotal >= 999 ? 0 : 80;
-    cart.grandTotal =
-      cart.itemsTotal + cart.taxAmount + cart.deliveryCharge;
+    Object.assign(cart, calculateCartTotals(cart.items));
 
     await cart.save();
 
     return res.status(200).json({
       success: true,
       message: "Item removed from cart",
-      data: cart
+      data: toPublicCart(cart)
     });
   } catch (error) {
     return res.status(500).json({

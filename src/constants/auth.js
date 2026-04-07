@@ -1,0 +1,20 @@
+export const AUTH_COOKIES = {
+  ACCESS: "pa_access",
+  REFRESH: "pa_refresh",
+  CSRF: "pa_csrf",
+};
+
+export const AUTH_TOKEN_TYPE = {
+  ACCESS: "access",
+  REFRESH: "refresh",
+};
+
+export const AUTH_ERRORS = {
+  TOKEN_MISSING: "TOKEN_MISSING",
+  TOKEN_INVALID: "TOKEN_INVALID",
+  TOKEN_EXPIRED: "TOKEN_EXPIRED",
+  SESSION_MISSING: "SESSION_MISSING",
+  SESSION_REVOKED: "SESSION_REVOKED",
+  USER_BLOCKED: "USER_BLOCKED",
+  ROLE_INVALID: "ROLE_INVALID",
+};

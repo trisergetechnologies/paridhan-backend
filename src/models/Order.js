@@ -28,6 +28,16 @@ const orderItemSchema = new mongoose.Schema(
       required: true
     },
 
+    variantPublicId: {
+      type: String,
+      trim: true
+    },
+
+    variantLabel: {
+      type: String,
+      trim: true
+    },
+
     // ===== SELLER SNAPSHOT =====
     seller: {
       type: mongoose.Schema.Types.ObjectId,
