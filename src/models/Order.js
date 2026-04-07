@@ -38,6 +38,23 @@ const orderItemSchema = new mongoose.Schema(
       trim: true
     },
 
+    gstPercent: {
+      type: Number,
+      min: 0,
+      max: 100
+    },
+
+    hsnCode: {
+      type: String,
+      trim: true
+    },
+
+    /** Tax amount for this line at order time (GST % × subtotal, rounded). */
+    lineTax: {
+      type: Number,
+      min: 0
+    },
+
     // ===== SELLER SNAPSHOT =====
     seller: {
       type: mongoose.Schema.Types.ObjectId,

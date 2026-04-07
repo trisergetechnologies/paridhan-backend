@@ -6,7 +6,7 @@ import {
 } from "../../services/productVariantHelpers.js";
 
 function buildBaseMatch(req) {
-  const query = { isActive: true };
+  const query = { isActive: true, isDeleted: { $ne: true } };
 
   if (req.query.category) {
     query.categories = req.query.category;
@@ -135,69 +135,91 @@ function trimHeroSubtitle(text, max = 200) {
   return `${t.slice(0, max).replace(/\s+\S*$/, "")}…`;
 }
 
+const heroLookupCategories = {
+  $lookup: {
+    from: "categories",
+    localField: "categories",
+    foreignField: "_id",
+    as: "categories",
+  },
+};
+
+const heroProjectClean = {
+  $project: {
+    _activeVariants: 0,
+    _hasVariants: 0,
+    _totalStock: 0,
+    _minPrice: 0,
+    _maxPrice: 0,
+  },
+};
+
+/** Aggregation stages for hero candidates: match → variant stats → optional post filter → sort → limit → populate. */
+function buildHeroPipeline(baseMatch, postMatch, sort, limit) {
+  return [
+    { $match: baseMatch },
+    ...buildVariantStatsStages(),
+    ...(Object.keys(postMatch).length ? [{ $match: postMatch }] : []),
+    { $sort: sort },
+    { $limit: limit },
+    heroLookupCategories,
+    heroProjectClean,
+  ];
+}
+
 /**
- * Featured products formatted for the home hero carousel.
- * Limit is controlled by HERO_SLIDE_LIMIT (default 5).
+ * GET /public/hero — carousel slides from the catalog.
+ * 1) Featured products (isFeatured, active, not deleted).
+ * 2) If none: latest in-stock products.
+ * 3) If still none: latest products (any stock).
  */
 export const getHeroSlides = async (req, res) => {
   try {
     const limit = getHeroSlideLimit();
-    const baseMatch = buildBaseMatch({ query: { featured: "true" } });
-    const postMatch = {};
-    const sort = buildSort({ query: {} });
+    const sort = { createdAt: -1 };
+    const placeholderImage =
+      String(process.env.HERO_PLACEHOLDER_IMAGE_URL || "").trim() ||
+      "https://picsum.photos/seed/paridhan-hero/1920/1080";
 
-    const lookupCategories = {
-      $lookup: {
-        from: "categories",
-        localField: "categories",
-        foreignField: "_id",
-        as: "categories",
-      },
+    const featuredMatch = buildBaseMatch({ query: { featured: "true" } });
+    let rawItems = await Product.aggregate(buildHeroPipeline(featuredMatch, {}, sort, limit));
+    let source = "featured";
+
+    if (!rawItems.length) {
+      const anyMatch = buildBaseMatch({ query: {} });
+      rawItems = await Product.aggregate(
+        buildHeroPipeline(anyMatch, { _totalStock: { $gt: 0 } }, sort, limit),
+      );
+      source = "latest_in_stock";
+    }
+
+    if (!rawItems.length) {
+      const anyMatch = buildBaseMatch({ query: {} });
+      rawItems = await Product.aggregate(buildHeroPipeline(anyMatch, {}, sort, limit));
+      source = "latest";
+    }
+
+    const totalFeatured = await Product.countDocuments(
+      buildBaseMatch({ query: { featured: "true" } }),
+    );
+
+    const eyebrowBySource = {
+      featured: "Featured now",
+      latest_in_stock: "New in store",
+      latest: "Discover",
     };
-
-    const projectClean = {
-      $project: {
-        _activeVariants: 0,
-        _hasVariants: 0,
-        _totalStock: 0,
-        _minPrice: 0,
-        _maxPrice: 0,
-      },
-    };
-
-    const pipeline = [
-      { $match: baseMatch },
-      ...buildVariantStatsStages(),
-      ...(Object.keys(postMatch).length ? [{ $match: postMatch }] : []),
-      {
-        $facet: {
-          items: [
-            { $sort: sort },
-            { $skip: 0 },
-            { $limit: limit },
-            lookupCategories,
-            projectClean,
-          ],
-          totalCount: [{ $count: "count" }],
-        },
-      },
-    ];
-
-    const [agg] = await Product.aggregate(pipeline);
-    const rawItems = agg?.items || [];
-    const totalFeatured = agg?.totalCount?.[0]?.count ?? 0;
 
     const slides = rawItems.map((doc) => {
       const item = toPublicProductList(doc);
+      const img = (item.images?.[0]?.url || "").trim();
       return {
         id: item.publicId,
-        eyebrow: "Featured now",
+        eyebrow: eyebrowBySource[source] || "Shop now",
         title: item.name,
         subtitle: trimHeroSubtitle(
-          item.description ||
-            "Curated premium styles for celebrations and every day in between."
+          item.description || "Curated styles for celebrations and every day.",
         ),
-        image: item.images?.[0]?.url || "/images/collection01.png",
+        image: img || placeholderImage,
         cta: "Shop this look",
         href: `/product/${item.slug}`,
       };
@@ -208,6 +230,7 @@ export const getHeroSlides = async (req, res) => {
       message: "Hero slides fetched successfully",
       data: {
         limit,
+        source,
         totalFeatured,
         slides,
       },
@@ -306,6 +329,7 @@ export const getSingleProduct = async (req, res) => {
     const product = await Product.findOne({
       slug: String(slug).toLowerCase(),
       isActive: true,
+      isDeleted: { $ne: true },
     })
       .populate("categories", "name slug")
       .lean();

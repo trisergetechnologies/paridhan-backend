@@ -71,6 +71,14 @@ const ensureUserRoles = async (user) => {
   }
 };
 
+/** Dashboard / SPA clients that cannot rely on cross-site httpOnly cookies. */
+const wantsDashboardTokens = (req) => {
+  const h = req.headers["x-paridhan-client"];
+  if (h && String(h).toLowerCase() === "dashboard") return true;
+  if (process.env.DASHBOARD_RETURN_TOKENS === "true") return true;
+  return false;
+};
+
 const createSessionAndTokens = async ({
   user,
   activeRole,
@@ -103,6 +111,7 @@ const createSessionAndTokens = async ({
   });
 
   setAuthCookies(res, { accessToken, refreshToken });
+  return { accessToken, refreshToken };
 };
 
 
@@ -144,14 +153,20 @@ export const registerCustomer = async (req, res) => {
       roles: ["customer"],
     });
 
-    await createSessionAndTokens({ user, activeRole: "customer", req, res });
+    const tokens = await createSessionAndTokens({ user, activeRole: "customer", req, res });
+
+    const data = {
+      user: buildAuthResponse(user),
+    };
+    if (wantsDashboardTokens(req)) {
+      data.accessToken = tokens.accessToken;
+      data.refreshToken = tokens.refreshToken;
+    }
 
     return res.status(200).json({
       success: true,
       message: "Registration successful",
-      data: {
-        user: buildAuthResponse(user),
-      }
+      data,
     });
   } catch (error) {
     return res.status(500).json({
@@ -222,22 +237,28 @@ export const loginCustomer = async (req, res) => {
       });
     }
 
-    await createSessionAndTokens({
+    const tokens = await createSessionAndTokens({
       user,
       activeRole: roleContext.activeRole,
       req,
       res,
     });
 
+    const data = {
+      user: {
+        ...buildAuthResponse(user),
+        activeRole: roleContext.activeRole,
+      },
+    };
+    if (wantsDashboardTokens(req)) {
+      data.accessToken = tokens.accessToken;
+      data.refreshToken = tokens.refreshToken;
+    }
+
     return res.status(200).json({
       success: true,
       message: "Login successful",
-      data: {
-        user: {
-          ...buildAuthResponse(user),
-          activeRole: roleContext.activeRole,
-        },
-      }
+      data,
     });
   } catch (error) {
     return res.status(500).json({
@@ -250,7 +271,9 @@ export const loginCustomer = async (req, res) => {
 
 export const refreshSession = async (req, res) => {
   try {
-    const refreshToken = req.cookies?.[AUTH_COOKIES.REFRESH];
+    const refreshToken =
+      req.cookies?.[AUTH_COOKIES.REFRESH] ||
+      (typeof req.body?.refreshToken === "string" ? req.body.refreshToken.trim() : "");
     if (!refreshToken) {
       return res.status(401).json({
         success: false,
@@ -311,13 +334,19 @@ export const refreshSession = async (req, res) => {
 
     setAuthCookies(res, { accessToken, refreshToken: nextRefreshToken });
 
+    const data = {
+      user: buildAuthResponse(user),
+      activeRole: decoded.activeRole || "customer",
+    };
+    if (wantsDashboardTokens(req) || req.body?.refreshToken) {
+      data.accessToken = accessToken;
+      data.refreshToken = nextRefreshToken;
+    }
+
     return res.status(200).json({
       success: true,
       message: "Session refreshed",
-      data: {
-        user: buildAuthResponse(user),
-        activeRole: decoded.activeRole || "customer",
-      },
+      data,
     });
   } catch (error) {
     return res.status(401).json({

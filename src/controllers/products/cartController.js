@@ -28,7 +28,7 @@ export const getCart = async (req, res) => {
   try {
     let cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product",
-      "publicId slug isActive stock variants price mrp images name"
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
     );
 
     if (!cart) {
@@ -166,8 +166,14 @@ export const addToCart = async (req, res) => {
         price,
         mrp: mrp ?? product.mrp,
         quantity: parsedQuantity,
-        subtotal: price * parsedQuantity
+        subtotal: price * parsedQuantity,
       };
+      if (product.gstPercent != null && product.gstPercent !== "") {
+        newItem.gstPercent = Number(product.gstPercent);
+      }
+      if (product.hsnCode) {
+        newItem.hsnCode = String(product.hsnCode).trim();
+      }
       if (variantPublicId) {
         newItem.variantPublicId = variantPublicId;
         newItem.variantLabel = vLabel;

@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Cart from "../../models/Cart.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
-import { calculateCartTotals } from "../../services/pricingService.js";
+import { calculateCartTotals, lineTaxForSubtotal } from "../../services/pricingService.js";
 import { decrementStockForLine } from "../../services/orderInventoryService.js";
 
 export const createOrder = async (req, res) => {
@@ -42,6 +42,7 @@ export const createOrder = async (req, res) => {
     }
 
     const orderItems = cart.items.map((item) => {
+      const lineTax = lineTaxForSubtotal(item.subtotal, item);
       const row = {
         productId: item.product,
         name: item.name,
@@ -50,8 +51,15 @@ export const createOrder = async (req, res) => {
         mrp: item.mrp,
         quantity: item.quantity,
         subtotal: item.subtotal,
-        seller: item.seller
+        seller: item.seller,
+        lineTax,
       };
+      if (item.gstPercent != null && item.gstPercent !== "") {
+        row.gstPercent = Number(item.gstPercent);
+      }
+      if (item.hsnCode) {
+        row.hsnCode = String(item.hsnCode);
+      }
       if (item.variantPublicId) {
         row.variantPublicId = item.variantPublicId;
         row.variantLabel = item.variantLabel;

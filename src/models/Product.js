@@ -5,6 +5,7 @@ const variantImageSchema = new mongoose.Schema(
   {
     url: String,
     alt: String,
+    fileId: { type: String, trim: true },
   },
   { _id: false }
 );
@@ -91,6 +92,20 @@ const productSchema = new mongoose.Schema(
       max: 100,
     },
 
+    /** GST % applied to this product’s line subtotal at checkout; omit to use platform TAX_RATE. */
+    gstPercent: {
+      type: Number,
+      min: 0,
+      max: 100,
+    },
+
+    /** HSN code for invoicing / display (optional). */
+    hsnCode: {
+      type: String,
+      trim: true,
+      maxlength: 16,
+    },
+
     // ================= INVENTORY =================
     stock: {
       type: Number,
@@ -123,6 +138,7 @@ const productSchema = new mongoose.Schema(
       {
         url: String,
         alt: String,
+        fileId: { type: String, trim: true },
       },
     ],
 
@@ -139,6 +155,12 @@ const productSchema = new mongoose.Schema(
     isActive: {
       type: Boolean,
       default: true,
+    },
+
+    isDeleted: {
+      type: Boolean,
+      default: false,
+      index: true,
     },
 
     seller: {

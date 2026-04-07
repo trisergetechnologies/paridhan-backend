@@ -48,6 +48,17 @@ const cartItemSchema = new mongoose.Schema(
     variantLabel: {
       type: String,
       trim: true
+    },
+
+    gstPercent: {
+      type: Number,
+      min: 0,
+      max: 100
+    },
+
+    hsnCode: {
+      type: String,
+      trim: true
     }
   },
   { _id: false }

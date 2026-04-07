@@ -9,7 +9,8 @@
     "dev": "nodemon src/server.js",
     "seed": "node src/seed.js",
     "seed:destroy": "node src/seed.js --destroy",
-    "test": "node src/tests/role-cart-checkout.integration.js"
+    "seed:fresh": "node src/seed.fresh.js",
+    "test": "node src/tests/role-cart-checkout.integration.js && node src/tests/dashboard-admin-seller.integration.js"
   },
   "author": "Vaibhav Pandey",
   "license": "ISC",

@@ -1,3 +1,47 @@
+import User from "../../models/User.js";
+
+export const changeMyPassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword || String(newPassword).length < 6) {
+      return res.status(200).json({
+        success: false,
+        message: "Current password and new password (min 6 chars) are required",
+        data: null,
+      });
+    }
+
+    const user = await User.findById(req.user._id).select("+password");
+    if (!user) {
+      return res.status(200).json({ success: false, message: "User not found", data: null });
+    }
+
+    const ok = await user.matchPassword(currentPassword);
+    if (!ok) {
+      return res.status(200).json({
+        success: false,
+        message: "Current password is incorrect",
+        data: null,
+      });
+    }
+
+    user.password = newPassword;
+    user.passwordChangedAt = new Date();
+    await user.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated",
+      data: null,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+      data: null,
+    });
+  }
+};
 
 export const getMyProfile = async (req, res) => {
   try {

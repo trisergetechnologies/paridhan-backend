@@ -7,6 +7,7 @@ import AuthSession from "./models/AuthSession.js";
 import Order from "./models/Order.js";
 import Product from "./models/Product.js";
 import User from "./models/User.js";
+import StorefrontSettings from "./models/StorefrontSettings.js";
 import { calculateCartTotals } from "./services/pricingService.js";
 import {
   effectiveImages,
@@ -21,7 +22,19 @@ const connectDB = async () => {
 };
 
 const DEV_PRODUCT_COUNT = Number(process.env.SEED_PRODUCT_COUNT || 300);
-const DEFAULT_PASSWORD = "123456";
+/** Match HERO_SLIDE_LIMIT (default 5) so GET /public/hero always has featured rows after seed. */
+const HERO_FEATURED_COUNT = Math.min(Math.max(Math.floor(Number(process.env.HERO_SLIDE_LIMIT) || 5), 1), 12);
+/** Shared default for all seeded users unless SEED_PASSWORD is set. */
+const DEFAULT_PASSWORD = process.env.SEED_PASSWORD || "123456";
+
+/** Platform admin — use with dashboard “Platform admin” login (requestedRole: admin). */
+const SEED_ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || "admin@paridhan.com";
+
+/** Primary seller — use with dashboard “Seller” login (requestedRole: seller). */
+const SEED_SELLER_EMAIL = process.env.SEED_SELLER_EMAIL || "seller@paridhan.com";
+
+/** Secondary seller account (optional second storefront). */
+const SEED_SELLER2_EMAIL = process.env.SEED_SELLER2_EMAIL || "seller2@paridhan.com";
 
 const fabrics = ["Silk", "Cotton", "Georgette", "Organza", "Linen", "Chiffon"];
 const colors = ["Red", "Blue", "Green", "Maroon", "Black", "Pink", "Gold", "Purple"];
@@ -113,7 +126,7 @@ const makeProduct = ({ index, categories, sellerIds }) => {
     variants,
     categories: [categoryA, categoryB],
     seller,
-    isFeatured: index % 10 === 0,
+    isFeatured: index < HERO_FEATURED_COUNT || index % 10 === 0,
     isActive: true
   };
 };
@@ -237,14 +250,15 @@ const seedData = async () => {
       Product.deleteMany(),
       Cart.deleteMany(),
       Order.deleteMany(),
-      AuthSession.deleteMany()
+      AuthSession.deleteMany(),
+      StorefrontSettings.deleteMany(),
     ]);
 
     console.log("Database cleaned");
 
     const admin = await User.create({
       name: "Admin User",
-      email: "admin@paridhan.com",
+      email: SEED_ADMIN_EMAIL,
       password: DEFAULT_PASSWORD,
       role: "admin",
       roles: ["admin", "customer"],
@@ -252,7 +266,7 @@ const seedData = async () => {
 
     const seller1 = await User.create({
       name: "Seller One",
-      email: "seller@paridhan.com",
+      email: SEED_SELLER_EMAIL,
       password: DEFAULT_PASSWORD,
       role: "seller",
       roles: ["seller", "customer"],
@@ -261,7 +275,7 @@ const seedData = async () => {
 
     const seller2 = await User.create({
       name: "Seller Two",
-      email: "seller2@paridhan.com",
+      email: SEED_SELLER2_EMAIL,
       password: DEFAULT_PASSWORD,
       role: "seller",
       roles: ["seller", "customer"],
@@ -333,7 +347,26 @@ const seedData = async () => {
     await Order.insertMany(ordersPayload);
     console.log(`Orders seeded: ${ordersPayload.length}`);
 
+    const existingSf = await StorefrontSettings.findOne();
+    if (!existingSf) {
+      await StorefrontSettings.create({ mode: "live" });
+      console.log("Storefront settings: created (mode: live)");
+    }
+
     console.log("✅ Seeding completed successfully");
+    console.log("");
+    console.log("═══ Paridhan dashboard (local dev) ═══");
+    console.log("Point paridhan-dashboard-web at the API, e.g. in .env.local:");
+    console.log("  NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1");
+    console.log("");
+    console.log("Platform admin — choose “Platform admin” on /auth:");
+    console.log(`  Email:    ${SEED_ADMIN_EMAIL}`);
+    console.log(`  Password: ${DEFAULT_PASSWORD}`);
+    console.log("");
+    console.log("Seller — choose “Seller” on /auth:");
+    console.log(`  Email:    ${SEED_SELLER_EMAIL}  (or ${SEED_SELLER2_EMAIL})`);
+    console.log(`  Password: ${DEFAULT_PASSWORD}`);
+    console.log("");
     process.exit(0);
   } catch (error) {
     console.error(error);
@@ -349,7 +382,8 @@ if (process.argv[2] === "--destroy") {
       Product.deleteMany(),
       Cart.deleteMany(),
       Order.deleteMany(),
-      AuthSession.deleteMany()
+      AuthSession.deleteMany(),
+      StorefrontSettings.deleteMany(),
     ]);
     console.log("❌ All data destroyed");
     process.exit(0);
