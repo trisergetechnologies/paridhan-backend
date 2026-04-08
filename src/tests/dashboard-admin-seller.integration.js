@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const BASE_URL = process.env.TEST_API_URL || "http://127.0.0.1:5000/api/v1";
+const BASE_URL = process.env.TEST_API_URL || "http://127.0.0.1:4600/api/v1";
 
 const dashboardHeaders = {
   "Content-Type": "application/json",

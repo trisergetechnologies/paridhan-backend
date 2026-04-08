@@ -357,7 +357,7 @@ const seedData = async () => {
     console.log("");
     console.log("═══ Paridhan dashboard (local dev) ═══");
     console.log("Point paridhan-dashboard-web at the API, e.g. in .env.local:");
-    console.log("  NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1");
+    console.log("  NEXT_PUBLIC_API_URL=http://localhost:4601/api/v1");
     console.log("");
     console.log("Platform admin — choose “Platform admin” on /auth:");
     console.log(`  Email:    ${SEED_ADMIN_EMAIL}`);

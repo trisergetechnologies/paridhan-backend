@@ -74,7 +74,7 @@ const seedFresh = async () => {
     console.log(`  Password: ${DEFAULT_PASSWORD}`);
     console.log("");
     console.log("API base (example):");
-    console.log("  NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1");
+    console.log("  NEXT_PUBLIC_API_URL=http://localhost:4601/api/v1");
     console.log("");
     process.exit(0);
   } catch (error) {

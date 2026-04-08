@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-const BASE_URL = process.env.TEST_GATEWAY_URL || "http://127.0.0.1:4000/api/v1";
+const BASE_URL = process.env.TEST_GATEWAY_URL || "http://127.0.0.1:4601/api/v1";
 
 const parseCookies = (headers) => {
   const raw = headers.getSetCookie?.() || [];
