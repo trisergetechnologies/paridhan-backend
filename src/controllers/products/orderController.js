@@ -17,7 +17,10 @@ export const createOrder = async (req, res) => {
       });
     }
 
-    const cart = await Cart.findOne({ user: req.user._id });
+    const cart = await Cart.findOne({ user: req.user._id }).populate(
+      "items.product",
+      "publicId slug"
+    );
 
     if (!cart || cart.items.length === 0) {
       return res.status(200).json({
@@ -43,8 +46,12 @@ export const createOrder = async (req, res) => {
 
     const orderItems = cart.items.map((item) => {
       const lineTax = lineTaxForSubtotal(item.subtotal, item);
+      const productDoc =
+        item.product && typeof item.product === "object" ? item.product : null;
+      const productRef = productDoc?._id ?? item.product;
+
       const row = {
-        productId: item.product,
+        productId: productRef,
         name: item.name,
         image: item.image,
         price: item.price,
@@ -63,6 +70,12 @@ export const createOrder = async (req, res) => {
       if (item.variantPublicId) {
         row.variantPublicId = item.variantPublicId;
         row.variantLabel = item.variantLabel;
+      }
+      if (productDoc?.publicId) {
+        row.productPublicId = productDoc.publicId;
+      }
+      if (productDoc?.slug) {
+        row.productSlug = productDoc.slug;
       }
       return row;
     });

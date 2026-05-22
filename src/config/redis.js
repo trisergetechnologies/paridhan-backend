@@ -1,8 +1,17 @@
 import Redis from "ioredis";
 
 let redisClient = null;
+let redisDisabled = false;
+let redisErrorLogged = false;
+
+const logRedisUnavailable = (message) => {
+  if (redisErrorLogged) return;
+  redisErrorLogged = true;
+  console.warn("Backend Redis unavailable; continuing without Redis:", message);
+};
 
 export const getRedis = () => {
+  if (redisDisabled) return null;
   if (redisClient) return redisClient;
   const url = process.env.REDIS_URL;
   if (!url) return null;
@@ -11,10 +20,12 @@ export const getRedis = () => {
     lazyConnect: true,
     connectTimeout: 5000,
     maxRetriesPerRequest: 3,
+    enableOfflineQueue: false,
+    retryStrategy: null,
   });
 
   redisClient.on("error", (err) => {
-    console.warn("Backend Redis error:", err.message);
+    logRedisUnavailable(err.message);
   });
 
   return redisClient;
@@ -23,11 +34,16 @@ export const getRedis = () => {
 export const ensureRedis = async () => {
   const redis = getRedis();
   if (!redis) return null;
-  if (redis.status === "ready" || redis.status === "connecting") return redis;
+  if (redis.status === "ready") return redis;
+  if (redis.status === "connecting") return null;
   try {
     await redis.connect();
     return redis;
-  } catch {
+  } catch (error) {
+    logRedisUnavailable(error instanceof Error ? error.message : "connection failed");
+    redis.disconnect();
+    redisClient = null;
+    redisDisabled = true;
     return null;
   }
 };

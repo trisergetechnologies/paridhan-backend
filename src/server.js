@@ -82,7 +82,7 @@ app.get("/health/ready", async (_req, res) => {
   const redisCheck = timed(async () => {
     const redis = await ensureRedis();
     if (!redis) {
-      throw new Error("Redis unavailable or REDIS_URL missing");
+      return { optional: true, note: "Redis unavailable or REDIS_URL missing" };
     }
     const pong = await redis.ping();
     if (pong !== "PONG") throw new Error("Redis ping failed");
@@ -90,7 +90,7 @@ app.get("/health/ready", async (_req, res) => {
 
   const [mongo, redis] = await Promise.all([mongoCheck, redisCheck]);
   const checks = { mongo, redis };
-  const allHealthy = mongo.status === "up" && redis.status === "up";
+  const allHealthy = mongo.status === "up";
 
   return noStore(res).status(allHealthy ? 200 : 503).json({
     service: "paridhan-backend",

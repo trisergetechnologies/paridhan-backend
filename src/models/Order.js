@@ -8,6 +8,16 @@ const orderItemSchema = new mongoose.Schema(
       ref: "Product"
     },
 
+    productPublicId: {
+      type: String,
+      trim: true
+    },
+
+    productSlug: {
+      type: String,
+      trim: true
+    },
+
     name: String,
     image: String,
 

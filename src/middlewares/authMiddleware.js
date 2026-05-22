@@ -34,10 +34,14 @@ export const protect = async (req, res, next) => {
       return next();
     }
 
-    // Fallback verification (useful for direct backend calls).
+    // Fallback verification (useful for direct backend calls or when the
+    // gateway cannot verify locally and forwards auth to the backend).
     let token;
     if (req.headers.authorization?.startsWith("Bearer")) {
       token = req.headers.authorization.split(" ")[1];
+    }
+    if (!token && req.cookies?.pa_access) {
+      token = req.cookies.pa_access;
     }
     if (!token) {
       return res.status(401).json({

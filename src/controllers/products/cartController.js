@@ -9,12 +9,29 @@ import {
   variantLabel,
 } from "../../services/productVariantHelpers.js";
 
+/** Per-line cap for UI: min(50, available stock). Requires populated `item.product`. */
+function maxQuantityForCartItem(item) {
+  const p = item.product;
+  if (!p || typeof p !== "object" || !p.publicId) {
+    return undefined;
+  }
+  const variantPublicId = item.variantPublicId
+    ? String(item.variantPublicId).trim()
+    : "";
+  const variant = hasVariants(p) ? resolveVariant(p, variantPublicId) : null;
+  const stockAvailable = hasVariants(p)
+    ? Number(variant?.stock) || 0
+    : Number(p.stock) || 0;
+  return Math.min(50, Math.max(0, stockAvailable));
+}
+
 const toPublicCart = (cart) => ({
   ...cart.toObject(),
   items: cart.items.map((item) => ({
     ...item.toObject(),
     productId: item.product?.publicId || null,
     productSlug: item.product?.slug || null,
+    maxQuantity: maxQuantityForCartItem(item),
   })),
 });
 
@@ -62,7 +79,14 @@ export const getCart = async (req, res) => {
 
 export const addToCart = async (req, res) => {
   try {
-    const { productId, quantity = 1, variantPublicId: bodyVariantId } = req.body;
+    const {
+      productId,
+      quantity = 1,
+      variantPublicId: bodyVariantId,
+      setQuantity: bodySetQuantity,
+    } = req.body;
+
+    const isSet = Boolean(bodySetQuantity);
 
     if (!productId) {
       return res.status(200).json({
@@ -139,18 +163,42 @@ export const addToCart = async (req, res) => {
     );
 
     if (itemIndex > -1) {
-      const nextQuantity = cart.items[itemIndex].quantity + parsedQuantity;
-      if (stockAvailable < nextQuantity) {
+      if (isSet) {
+        if (stockAvailable < 1) {
+          return res.status(200).json({
+            success: false,
+            message: "Insufficient stock",
+            data: null
+          });
+        }
+        const nextQuantity = Math.max(
+          1,
+          Math.min(parsedQuantity, stockAvailable, 50)
+        );
+        cart.items[itemIndex].quantity = nextQuantity;
+        cart.items[itemIndex].subtotal =
+          cart.items[itemIndex].price * cart.items[itemIndex].quantity;
+      } else {
+        const nextQuantity = cart.items[itemIndex].quantity + parsedQuantity;
+        if (stockAvailable < nextQuantity) {
+          return res.status(200).json({
+            success: false,
+            message: "Insufficient stock",
+            data: null
+          });
+        }
+        cart.items[itemIndex].quantity = nextQuantity;
+        cart.items[itemIndex].subtotal =
+          cart.items[itemIndex].price * cart.items[itemIndex].quantity;
+      }
+    } else {
+      if (isSet) {
         return res.status(200).json({
           success: false,
-          message: "Insufficient stock",
+          message: "Cart line not found",
           data: null
         });
       }
-      cart.items[itemIndex].quantity = nextQuantity;
-      cart.items[itemIndex].subtotal =
-        cart.items[itemIndex].price * cart.items[itemIndex].quantity;
-    } else {
       if (stockAvailable < parsedQuantity) {
         return res.status(200).json({
           success: false,
@@ -184,6 +232,11 @@ export const addToCart = async (req, res) => {
     Object.assign(cart, calculateCartTotals(cart.items));
 
     await cart.save();
+
+    await cart.populate(
+      "items.product",
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
+    );
 
     return res.status(200).json({
       success: true,
@@ -246,6 +299,11 @@ export const removeFromCart = async (req, res) => {
     Object.assign(cart, calculateCartTotals(cart.items));
 
     await cart.save();
+
+    await cart.populate(
+      "items.product",
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
+    );
 
     return res.status(200).json({
       success: true,

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import "../../models/Category.js";
 import Product from "../../models/Product.js";
 import {
@@ -325,11 +326,21 @@ export const getAllProducts = async (req, res) => {
 export const getSingleProduct = async (req, res) => {
   try {
     const { slug } = req.params;
+    const raw = String(slug ?? "");
+    const normalizedSlug = raw.toLowerCase();
+
+    const orConditions = [{ slug: normalizedSlug }, { publicId: raw }];
+    if (
+      mongoose.Types.ObjectId.isValid(raw) &&
+      String(new mongoose.Types.ObjectId(raw)) === raw
+    ) {
+      orConditions.push({ _id: raw });
+    }
 
     const product = await Product.findOne({
-      slug: String(slug).toLowerCase(),
       isActive: true,
       isDeleted: { $ne: true },
+      $or: orConditions,
     })
       .populate("categories", "name slug")
       .lean();
