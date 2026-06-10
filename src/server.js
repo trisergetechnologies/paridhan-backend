@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import morgan from "morgan";
 
 import { isGoogleOAuthConfigured } from "./config/loadEnv.js";
+import { resolveCashfreeEnvironment } from "./services/cashfreeService.js";
 import { validateProductionEnv } from "./config/validateProductionEnv.js";
 import { ensureRedis } from "./config/redis.js";
 import connectDB from "./config/db.js";
@@ -127,5 +128,8 @@ app.listen(PORT, () => {
     );
   } else if (webhookSecret) {
     console.log("[payments] Cashfree webhook signature verification: enabled");
+  }
+  if (process.env.CASHFREE_APP_ID && process.env.CASHFREE_SECRET_KEY) {
+    console.log(`[payments] Cashfree PG environment: ${resolveCashfreeEnvironment()}`);
   }
 });

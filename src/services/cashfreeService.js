@@ -38,8 +38,28 @@ export function verifyCashfreeWebhookSignature({ timestamp, signature, rawBody }
   return { ok: true };
 }
 
+/** Infer live vs sandbox from secret shape when CASHFREE_ENV is wrong. */
+export function resolveCashfreeEnvironment() {
+  const configured = String(process.env.CASHFREE_ENV || "").trim().toLowerCase();
+  const secret = String(process.env.CASHFREE_SECRET_KEY || "");
+  const appId = String(process.env.CASHFREE_APP_ID || "");
+
+  const looksProduction = /cfsk_ma_prod|_prod_/i.test(secret);
+  const looksSandbox =
+    /cfsk_ma_test|_test_/i.test(secret) || /^TEST/i.test(appId);
+
+  if (looksProduction) return "production";
+  if (looksSandbox) return "sandbox";
+  if (configured === "production" || configured === "sandbox") return configured;
+  return "sandbox";
+}
+
+export function getCashfreeCheckoutMode() {
+  return resolveCashfreeEnvironment() === "production" ? "production" : "sandbox";
+}
+
 function cashfreeBaseUrl() {
-  return process.env.CASHFREE_ENV === "production"
+  return resolveCashfreeEnvironment() === "production"
     ? "https://api.cashfree.com/pg"
     : "https://sandbox.cashfree.com/pg";
 }
@@ -95,8 +115,17 @@ export async function createCashfreePaymentSession({
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const message =
+    const rawMessage =
       data?.message || data?.error?.message || "Cashfree order creation failed";
+    const isAuthError =
+      res.status === 401 ||
+      /authentication|unauthorized|invalid.*credential|verify credential/i.test(
+        String(rawMessage),
+      );
+    const message = isAuthError
+      ? `Cashfree authentication failed (${resolveCashfreeEnvironment()} API). ` +
+        "Use sandbox keys with CASHFREE_ENV=sandbox, or live keys with CASHFREE_ENV=production."
+      : rawMessage;
     throw Object.assign(new Error(message), { code: "CASHFREE_API_ERROR", data });
   }
 

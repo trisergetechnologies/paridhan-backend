@@ -24,8 +24,15 @@ export function validateProductionEnv() {
   checkUrl("BACKEND_PUBLIC_URL", process.env.BACKEND_PUBLIC_URL);
   checkUrl("GOOGLE_OAUTH_CALLBACK_URL", process.env.GOOGLE_OAUTH_CALLBACK_URL);
 
-  if (process.env.CASHFREE_ENV !== "production") {
-    warnings.push("CASHFREE_ENV is not 'production' (live payments may fail)");
+  const cfSecret = String(process.env.CASHFREE_SECRET_KEY || "");
+  const cfEnv = String(process.env.CASHFREE_ENV || "").toLowerCase();
+  if (/cfsk_ma_prod|_prod_/i.test(cfSecret) && cfEnv === "sandbox") {
+    errors.push(
+      "CASHFREE_ENV=sandbox but production Cashfree secret detected — set CASHFREE_ENV=production",
+    );
+  }
+  if (process.env.CASHFREE_ENV !== "production" && /cfsk_ma_prod|_prod_/i.test(cfSecret)) {
+    warnings.push("Using production Cashfree keys — set CASHFREE_ENV=production");
   }
 
   if (

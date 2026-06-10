@@ -2,7 +2,10 @@ import mongoose from "mongoose";
 import Cart from "../../models/Cart.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
-import { createCashfreePaymentSession } from "../../services/cashfreeService.js";
+import {
+  createCashfreePaymentSession,
+  getCashfreeCheckoutMode,
+} from "../../services/cashfreeService.js";
 import { discardDraftOrder } from "../../services/orderFulfillmentService.js";
 import { calculateCartTotals, lineTaxForSubtotal } from "../../services/pricingService.js";
 
@@ -191,7 +194,7 @@ export const createOrder = async (req, res) => {
           provider: "cashfree",
           paymentSessionId: sessionInfo.paymentSessionId,
           cashfreeOrderId: sessionInfo.cashfreeOrderId,
-          mode: process.env.CASHFREE_ENV === "production" ? "production" : "sandbox",
+          mode: getCashfreeCheckoutMode(),
         };
       } catch (err) {
         await discardDraftOrder(createdOrder._id);

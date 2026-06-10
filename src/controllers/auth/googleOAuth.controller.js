@@ -74,7 +74,7 @@ export const startGoogleOAuth = async (req, res) => {
 
     const client = String(req.query.client || "storefront").toLowerCase();
     const requestedRole = String(req.query.role || (client === "dashboard" ? "admin" : "customer")).toLowerCase();
-    const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/shop";
+    const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
 
     if (!["storefront", "dashboard"].includes(client)) {
       return res.status(400).json({
@@ -87,7 +87,7 @@ export const startGoogleOAuth = async (req, res) => {
     const state = signOAuthState({
       client,
       requestedRole,
-      returnTo: returnTo.startsWith("/") ? returnTo : "/shop",
+      returnTo: returnTo.startsWith("/") ? returnTo : "/",
       nonce: Date.now(),
     });
 
