@@ -73,8 +73,16 @@ export const startGoogleOAuth = async (req, res) => {
     }
 
     const client = String(req.query.client || "storefront").toLowerCase();
-    const requestedRole = String(req.query.role || (client === "dashboard" ? "admin" : "customer")).toLowerCase();
+    const requestedRole = String(req.query.role || "customer").toLowerCase();
     const returnTo = typeof req.query.returnTo === "string" ? req.query.returnTo : "/";
+
+    if (client === "dashboard" || requestedRole === "admin" || requestedRole === "seller") {
+      return res.status(403).json({
+        success: false,
+        message: "Google sign-in is only available for customer accounts on the storefront.",
+        data: null,
+      });
+    }
 
     if (!["storefront", "dashboard"].includes(client)) {
       return res.status(400).json({

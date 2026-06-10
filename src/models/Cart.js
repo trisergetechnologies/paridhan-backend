@@ -59,7 +59,17 @@ const cartItemSchema = new mongoose.Schema(
     hsnCode: {
       type: String,
       trim: true
-    }
+    },
+
+    shippingUseDefault: {
+      type: Boolean,
+      default: true,
+    },
+
+    shippingCharge: {
+      type: Number,
+      min: 0,
+    },
   },
   { _id: false }
 );

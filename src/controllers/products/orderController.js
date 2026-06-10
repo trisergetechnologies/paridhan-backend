@@ -54,7 +54,7 @@ async function createPendingPrepaidOrder({ orderItems, totals, address, userId, 
         grandTotal: totals.grandTotal,
         paymentMethod: "online",
         paymentStatus: "pending",
-        orderStatus: "placed",
+        orderStatus: "awaiting_payment",
         inventoryFulfilled: false,
       },
     ],
@@ -78,7 +78,7 @@ export const createOrder = async (req, res) => {
 
     const cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product",
-      "publicId slug"
+      "publicId slug shippingUseDefault shippingCharge"
     );
 
     if (!cart || cart.items.length === 0) {
@@ -138,7 +138,15 @@ export const createOrder = async (req, res) => {
       }
       return row;
     });
-    const totals = calculateCartTotals(orderItems);
+    const totals = calculateCartTotals(
+      cart.items.map((item) => ({
+        subtotal: item.subtotal,
+        gstPercent: item.gstPercent,
+        product: item.product,
+        shippingUseDefault: item.shippingUseDefault,
+        shippingCharge: item.shippingCharge,
+      })),
+    );
 
     let createdOrder = null;
 
@@ -247,13 +255,21 @@ export const getMyOrders = async (req, res) => {
 
     const skip = (page - 1) * limit;
 
-    const [orders, total] = await Promise.all([
-      Order.find({ user: req.user._id })
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+    const visibleOrderFilter = {
+      user: req.user._id,
+      $nor: [
+        {
+          paymentMethod: "online",
+          paymentStatus: "pending",
+          inventoryFulfilled: false,
+        },
+      ],
+    };
 
-      Order.countDocuments({ user: req.user._id })
+    const [orders, total] = await Promise.all([
+      Order.find(visibleOrderFilter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+
+      Order.countDocuments(visibleOrderFilter),
     ]);
 
     return res.status(200).json({

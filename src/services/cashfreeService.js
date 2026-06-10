@@ -162,5 +162,13 @@ export function mapCashfreePaymentStatus(orderStatus) {
   const status = String(orderStatus || "").toUpperCase();
   if (status === "PAID") return "paid";
   if (status === "ACTIVE" || status === "PENDING") return "pending";
-  return "failed";
+  if (
+    ["EXPIRED", "TERMINATED", "CANCELLED", "FAILED", "VOID", "USER_DROPPED"].includes(
+      status,
+    )
+  ) {
+    return "failed";
+  }
+  if (!status) return "pending";
+  return "pending";
 }

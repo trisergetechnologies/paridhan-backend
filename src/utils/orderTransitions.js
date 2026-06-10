@@ -1,7 +1,16 @@
-const ORDER_STATUSES = ["placed", "confirmed", "packed", "shipped", "delivered", "cancelled"];
+const ORDER_STATUSES = [
+  "awaiting_payment",
+  "placed",
+  "confirmed",
+  "packed",
+  "shipped",
+  "delivered",
+  "cancelled",
+];
 const PAYMENT_STATUSES = ["pending", "paid", "failed"];
 
 const ALLOWED_FROM = {
+  awaiting_payment: new Set(["cancelled"]),
   placed: new Set(["confirmed", "cancelled"]),
   confirmed: new Set(["packed", "cancelled"]),
   packed: new Set(["shipped", "cancelled"]),

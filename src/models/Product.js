@@ -106,6 +106,18 @@ const productSchema = new mongoose.Schema(
       maxlength: 16,
     },
 
+    /** When true, platform shipping rules apply (free above threshold, else base fee). */
+    shippingUseDefault: {
+      type: Boolean,
+      default: true,
+    },
+
+    /** Flat delivery charge when shippingUseDefault is false. */
+    shippingCharge: {
+      type: Number,
+      min: 0,
+    },
+
     // ================= INVENTORY =================
     stock: {
       type: Number,

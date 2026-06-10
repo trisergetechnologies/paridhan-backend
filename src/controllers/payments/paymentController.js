@@ -1,6 +1,6 @@
 import Order from "../../models/Order.js";
 import {
-  cancelPendingPrepaidOrder,
+  discardDraftOrder,
   finalizePaidOrder,
 } from "../../services/orderFulfillmentService.js";
 import {
@@ -16,7 +16,9 @@ async function applyPaymentStatus(order, mapped) {
     return "paid";
   }
   if (mapped === "failed") {
-    await cancelPendingPrepaidOrder(order);
+    if (order.paymentStatus !== "paid" && !order.inventoryFulfilled) {
+      await discardDraftOrder(order._id);
+    }
     return "failed";
   }
   return "pending";
@@ -115,7 +117,8 @@ export const verifyCashfreePayment = async (req, res) => {
     const cfOrder = await fetchCashfreeOrder(order.cashfreeOrderId);
     const mapped = mapCashfreePaymentStatus(cfOrder.order_status);
     const finalStatus = await applyPaymentStatus(order, mapped);
-    const fresh = await Order.findById(order._id);
+    const fresh =
+      finalStatus === "failed" ? null : await Order.findById(order._id);
 
     return res.status(200).json({
       success: finalStatus === "paid",
@@ -124,8 +127,11 @@ export const verifyCashfreePayment = async (req, res) => {
           ? "Payment successful"
           : finalStatus === "pending"
             ? "Payment is still processing"
-            : "Payment failed — your cart is unchanged",
-      data: { order: fresh, paymentStatus: fresh?.paymentStatus ?? finalStatus },
+            : "Payment failed — no order was created. Your cart is unchanged.",
+      data: {
+        order: fresh,
+        paymentStatus: fresh?.paymentStatus ?? finalStatus,
+      },
     });
   } catch (error) {
     if (error?.code === "CASHFREE_NOT_CONFIGURED") {

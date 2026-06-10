@@ -1,6 +1,6 @@
 import Cart from "../../models/Cart.js";
 import Product from "../../models/Product.js";
-import { calculateCartTotals } from "../../services/pricingService.js";
+import { calculateCartTotals, resolveLineShipping } from "../../services/pricingService.js";
 import {
   effectiveImages,
   getEffectiveVariantPrice,
@@ -41,11 +41,37 @@ function sameCartLine(a, b) {
   return a.product.toString() === b.product.toString() && va === vb;
 }
 
+function applyProductShippingToItem(item, product) {
+  const resolved = resolveLineShipping({
+    shippingUseDefault: item.shippingUseDefault,
+    shippingCharge: item.shippingCharge,
+    subtotal: item.subtotal,
+    product,
+  });
+  item.shippingUseDefault = resolved.shippingUseDefault;
+  if (!resolved.shippingUseDefault) {
+    item.shippingCharge = resolved.shippingCharge;
+  } else {
+    item.shippingCharge = undefined;
+  }
+}
+
+function recalculateCartTotals(cart) {
+  const pricingItems = cart.items.map((item) => ({
+    subtotal: item.subtotal,
+    gstPercent: item.gstPercent,
+    product: item.product,
+    shippingUseDefault: item.shippingUseDefault,
+    shippingCharge: item.shippingCharge,
+  }));
+  Object.assign(cart, calculateCartTotals(pricingItems));
+}
+
 export const getCart = async (req, res) => {
   try {
     let cart = await Cart.findOne({ user: req.user._id }).populate(
       "items.product",
-      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode shippingUseDefault shippingCharge"
     );
 
     if (!cart) {
@@ -60,6 +86,18 @@ export const getCart = async (req, res) => {
           grandTotal: 0
         }
       });
+    }
+
+    const prevDelivery = cart.deliveryCharge;
+    const prevGrand = cart.grandTotal;
+    for (const item of cart.items) {
+      if (item.product && typeof item.product === "object") {
+        applyProductShippingToItem(item, item.product);
+      }
+    }
+    recalculateCartTotals(cart);
+    if (cart.deliveryCharge !== prevDelivery || cart.grandTotal !== prevGrand) {
+      await cart.save();
     }
 
     return res.status(200).json({
@@ -222,6 +260,11 @@ export const addToCart = async (req, res) => {
       if (product.hsnCode) {
         newItem.hsnCode = String(product.hsnCode).trim();
       }
+      const shipping = resolveLineShipping({ product });
+      newItem.shippingUseDefault = shipping.shippingUseDefault;
+      if (!shipping.shippingUseDefault) {
+        newItem.shippingCharge = shipping.shippingCharge;
+      }
       if (variantPublicId) {
         newItem.variantPublicId = variantPublicId;
         newItem.variantLabel = vLabel;
@@ -229,13 +272,13 @@ export const addToCart = async (req, res) => {
       cart.items.push(newItem);
     }
 
-    Object.assign(cart, calculateCartTotals(cart.items));
+    recalculateCartTotals(cart);
 
     await cart.save();
 
     await cart.populate(
       "items.product",
-      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode shippingUseDefault shippingCharge"
     );
 
     return res.status(200).json({
@@ -296,13 +339,13 @@ export const removeFromCart = async (req, res) => {
       });
     }
 
-    Object.assign(cart, calculateCartTotals(cart.items));
+    recalculateCartTotals(cart);
 
     await cart.save();
 
     await cart.populate(
       "items.product",
-      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode"
+      "publicId slug isActive stock variants price mrp images name gstPercent hsnCode shippingUseDefault shippingCharge"
     );
 
     return res.status(200).json({

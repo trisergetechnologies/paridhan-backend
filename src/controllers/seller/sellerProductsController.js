@@ -153,6 +153,8 @@ export const createSellerProduct = async (req, res) => {
       discountPercentage,
       gstPercent,
       hsnCode,
+      shippingUseDefault,
+      shippingCharge,
     } = req.body;
 
     if (!name || !description || price === undefined || stock === undefined) {
@@ -166,6 +168,15 @@ export const createSellerProduct = async (req, res) => {
     const cat = await validateCategoryIds(categories);
     if (!cat.ok) {
       return res.status(200).json({ success: false, message: cat.message, data: null });
+    }
+
+    const useDefaultShipping = shippingUseDefault !== false;
+    if (!useDefaultShipping && (shippingCharge == null || shippingCharge === "")) {
+      return res.status(200).json({
+        success: false,
+        message: "Custom shipping charge is required when not using platform default",
+        data: null,
+      });
     }
 
     const baseSlug = slugify(slugInput || name);
@@ -198,6 +209,10 @@ export const createSellerProduct = async (req, res) => {
           : undefined,
       gstPercent: gstPercent != null && gstPercent !== "" ? Number(gstPercent) : undefined,
       hsnCode: hsnCode != null && String(hsnCode).trim() ? String(hsnCode).trim() : undefined,
+      shippingUseDefault: useDefaultShipping,
+      shippingCharge: useDefaultShipping
+        ? undefined
+        : Math.max(0, Number(shippingCharge)),
       isFeatured: Boolean(isFeatured),
       seller: req.user._id,
       isActive: true,
@@ -239,6 +254,8 @@ export const updateSellerProduct = async (req, res) => {
       "discountPercentage",
       "gstPercent",
       "hsnCode",
+      "shippingUseDefault",
+      "shippingCharge",
     ];
 
     for (const key of allowed) {
@@ -250,6 +267,21 @@ export const updateSellerProduct = async (req, res) => {
       }
       if (key === "hsnCode") {
         product.hsnCode = req.body.hsnCode ? String(req.body.hsnCode).trim() : undefined;
+        continue;
+      }
+      if (key === "shippingUseDefault") {
+        product.shippingUseDefault = req.body.shippingUseDefault !== false;
+        if (product.shippingUseDefault) {
+          product.shippingCharge = undefined;
+        }
+        continue;
+      }
+      if (key === "shippingCharge") {
+        if (product.shippingUseDefault === false) {
+          const v = req.body.shippingCharge;
+          product.shippingCharge =
+            v === null || v === "" ? undefined : Math.max(0, Number(v));
+        }
         continue;
       }
       if (key === "price" || key === "mrp" || key === "stock") {
@@ -298,6 +330,14 @@ export const updateSellerProduct = async (req, res) => {
         alt: i.alt || "",
         ...(i.fileId ? { fileId: String(i.fileId) } : {}),
       }));
+    }
+
+    if (product.shippingUseDefault === false && product.shippingCharge == null) {
+      return res.status(200).json({
+        success: false,
+        message: "Custom shipping charge is required when not using platform default",
+        data: null,
+      });
     }
 
     await product.save();
