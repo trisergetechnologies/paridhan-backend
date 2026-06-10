@@ -6,6 +6,7 @@ import mongoose from "mongoose";
 import morgan from "morgan";
 
 import { isGoogleOAuthConfigured } from "./config/loadEnv.js";
+import { validateProductionEnv } from "./config/validateProductionEnv.js";
 import { ensureRedis } from "./config/redis.js";
 import connectDB from "./config/db.js";
 import router from "./routes/index.js";
@@ -111,6 +112,8 @@ app.get("/health/ready", async (_req, res) => {
 
 // ================= SERVER =================
 const PORT = process.env.PORT || 4600;
+
+validateProductionEnv();
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
