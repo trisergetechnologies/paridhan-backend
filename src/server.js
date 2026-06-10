@@ -1,22 +1,30 @@
+import "./config/loadEnv.js";
 import cors from "cors";
 import cookieParser from "cookie-parser";
-import dotenv from "dotenv";
 import express from "express";
 import mongoose from "mongoose";
 import morgan from "morgan";
 
+import { isGoogleOAuthConfigured } from "./config/loadEnv.js";
 import { ensureRedis } from "./config/redis.js";
 import connectDB from "./config/db.js";
 import router from "./routes/index.js";
 
-dotenv.config();
 connectDB();
 
 const app = express();
 
 // ================= MIDDLEWARES =================
 app.use(cors({ origin: true, credentials: true }));
-app.use(express.json());
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      if (String(req.originalUrl || "").includes("/payments/cashfree/webhook")) {
+        req.rawBody = buf.toString("utf8");
+      }
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
@@ -106,4 +114,15 @@ const PORT = process.env.PORT || 4600;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(
+    `[auth] Google OAuth: ${isGoogleOAuthConfigured() ? "configured" : "not configured (set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET in .env)"}`,
+  );
+  const webhookSecret = String(process.env.CASHFREE_WEBHOOK_SECRET || "").trim();
+  if (process.env.NODE_ENV === "production" && !webhookSecret) {
+    console.warn(
+      "[payments] Cashfree webhooks: CASHFREE_WEBHOOK_SECRET not set — webhooks will be rejected in production",
+    );
+  } else if (webhookSecret) {
+    console.log("[payments] Cashfree webhook signature verification: enabled");
+  }
 });

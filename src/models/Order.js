@@ -148,6 +148,24 @@ const orderSchema = new mongoose.Schema(
       default: "pending"
     },
 
+    cashfreeOrderId: {
+      type: String,
+      trim: true,
+      index: true,
+      sparse: true
+    },
+
+    paymentSessionId: {
+      type: String,
+      trim: true
+    },
+
+    /** Stock decremented only after prepaid payment succeeds. */
+    inventoryFulfilled: {
+      type: Boolean,
+      default: false
+    },
+
     // ================= ORDER STATUS =================
     orderStatus: {
       type: String,

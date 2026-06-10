@@ -2,17 +2,73 @@ import mongoose from "mongoose";
 import Cart from "../../models/Cart.js";
 import Order from "../../models/Order.js";
 import User from "../../models/User.js";
+import { createCashfreePaymentSession } from "../../services/cashfreeService.js";
+import { discardDraftOrder } from "../../services/orderFulfillmentService.js";
 import { calculateCartTotals, lineTaxForSubtotal } from "../../services/pricingService.js";
-import { decrementStockForLine } from "../../services/orderInventoryService.js";
+
+function buildReturnUrl(orderMongoId) {
+  const base =
+    process.env.STOREFRONT_URL ||
+    process.env.CASHFREE_RETURN_URL_BASE ||
+    "http://localhost:3000";
+  return `${base.replace(/\/$/, "")}/checkout/payment-return?orderId=${orderMongoId}`;
+}
+
+function buildNotifyUrl() {
+  const base =
+    process.env.BACKEND_PUBLIC_URL ||
+    process.env.CASHFREE_NOTIFY_URL_BASE ||
+    `http://localhost:${process.env.PORT || 4600}`;
+  return `${base.replace(/\/$/, "")}/api/v1/public/payments/cashfree/webhook`;
+}
+
+function isReplicaSetRequiredError(err) {
+  const msg = String(err?.message || "");
+  return msg.includes("replica set") || msg.includes("mongos");
+}
+
+/** Create a pending prepaid order. Cart and stock are untouched until payment succeeds. */
+async function createPendingPrepaidOrder({ orderItems, totals, address, userId, session }) {
+  const createOpts = session ? { session } : {};
+  const [orderDoc] = await Order.create(
+    [
+      {
+        user: userId,
+        orderNumber: `ORD-${Date.now()}`,
+        items: orderItems,
+        shippingAddress: {
+          fullName: address.fullName,
+          phone: address.phone,
+          street: address.street,
+          city: address.city,
+          state: address.state,
+          postalCode: address.postalCode,
+          country: address.country,
+        },
+        itemsTotal: totals.itemsTotal,
+        taxAmount: totals.taxAmount,
+        deliveryCharge: totals.deliveryCharge,
+        grandTotal: totals.grandTotal,
+        paymentMethod: "online",
+        paymentStatus: "pending",
+        orderStatus: "placed",
+        inventoryFulfilled: false,
+      },
+    ],
+    createOpts
+  );
+
+  return orderDoc;
+}
 
 export const createOrder = async (req, res) => {
   try {
-    const { addressSlug, paymentMethod } = req.body;
+    const { addressSlug } = req.body;
 
-    if (!addressSlug || !paymentMethod) {
+    if (!addressSlug) {
       return res.status(200).json({
         success: false,
-        message: "Address slug and payment method are required",
+        message: "Delivery address is required",
         data: null
       });
     }
@@ -81,51 +137,86 @@ export const createOrder = async (req, res) => {
     });
     const totals = calculateCartTotals(orderItems);
 
-    const session = await mongoose.startSession();
     let createdOrder = null;
 
     try {
-      await session.withTransaction(async () => {
-        for (const line of cart.items) {
-          const ok = await decrementStockForLine(line, session);
-          if (!ok) {
-            throw Object.assign(new Error("INSUFFICIENT_STOCK"), { code: "INSUFFICIENT_STOCK" });
-          }
+      const session = await mongoose.startSession();
+      try {
+        try {
+          await session.withTransaction(async () => {
+            createdOrder = await createPendingPrepaidOrder({
+              orderItems,
+              totals,
+              address,
+              userId: req.user._id,
+              session,
+            });
+          });
+        } catch (txErr) {
+          if (!isReplicaSetRequiredError(txErr)) throw txErr;
+          createdOrder = await createPendingPrepaidOrder({
+            orderItems,
+            totals,
+            address,
+            userId: req.user._id,
+            session: null,
+          });
         }
+      } finally {
+        await session.endSession();
+      }
 
-        const [orderDoc] = await Order.create(
-          [
-            {
-              user: req.user._id,
-              orderNumber: `ORD-${Date.now()}`,
-              items: orderItems,
-              shippingAddress: {
-                fullName: address.fullName,
-                phone: address.phone,
-                street: address.street,
-                city: address.city,
-                state: address.state,
-                postalCode: address.postalCode,
-                country: address.country
-              },
-              itemsTotal: totals.itemsTotal,
-              taxAmount: totals.taxAmount,
-              deliveryCharge: totals.deliveryCharge,
-              grandTotal: totals.grandTotal,
-              paymentMethod
-            }
-          ],
-          { session }
-        );
+      let payment = null;
 
-        createdOrder = orderDoc;
-        await Cart.deleteOne({ user: req.user._id }).session(session);
-      });
+      try {
+        const cfOrderId = createdOrder.orderNumber;
+        const sessionInfo = await createCashfreePaymentSession({
+          orderId: cfOrderId,
+          amount: createdOrder.grandTotal,
+          customer: {
+            id: user._id,
+            name: address.fullName,
+            email: user.email,
+            phone: address.phone,
+          },
+          returnUrl: buildReturnUrl(createdOrder._id),
+          notifyUrl: buildNotifyUrl(),
+        });
+
+        createdOrder.cashfreeOrderId = sessionInfo.cashfreeOrderId;
+        createdOrder.paymentSessionId = sessionInfo.paymentSessionId;
+        await createdOrder.save();
+
+        payment = {
+          provider: "cashfree",
+          paymentSessionId: sessionInfo.paymentSessionId,
+          cashfreeOrderId: sessionInfo.cashfreeOrderId,
+          mode: process.env.CASHFREE_ENV === "production" ? "production" : "sandbox",
+        };
+      } catch (err) {
+        await discardDraftOrder(createdOrder._id);
+        if (err?.code === "CASHFREE_NOT_CONFIGURED") {
+          return res.status(200).json({
+            success: false,
+            message:
+              "Online payment is not configured. Add CASHFREE_APP_ID and CASHFREE_SECRET_KEY to paridhan-backend/.env and restart the backend server.",
+            data: null,
+          });
+        }
+        return res.status(200).json({
+          success: false,
+          message: err.message || "Could not start online payment",
+          data: null,
+        });
+      }
 
       return res.status(200).json({
         success: true,
-        message: "Order placed successfully",
-        data: createdOrder
+        message: "Complete payment to confirm your order. Your cart is saved until payment succeeds.",
+        data: {
+          order: createdOrder,
+          payment,
+        },
       });
     } catch (err) {
       if (err?.code === "INSUFFICIENT_STOCK") {
@@ -136,8 +227,6 @@ export const createOrder = async (req, res) => {
         });
       }
       throw err;
-    } finally {
-      await session.endSession();
     }
   } catch (error) {
     return res.status(500).json({

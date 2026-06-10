@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js",
+    "dev": "nodemon --config nodemon.json src/server.js",
     "seed": "node src/seed.js",
     "seed:destroy": "node src/seed.js --destroy",
     "seed:fresh": "node src/seed.fresh.js",
@@ -20,6 +20,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
+    "google-auth-library": "^10.7.0",
     "ioredis": "^5.8.2",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.1.5",

@@ -40,7 +40,7 @@ const clearAuthCookies = (res) => {
   res.clearCookie(AUTH_COOKIES.REFRESH, { ...cookieBaseOptions, path: "/api/v1/auth" });
 };
 
-const buildAuthResponse = (user) => ({
+export const buildAuthResponse = (user) => ({
   id: user._id,
   name: user.name,
   email: user.email,
@@ -48,14 +48,14 @@ const buildAuthResponse = (user) => ({
   roles: user.roles || [user.role],
 });
 
-const resolveRequestedRole = (user, requestedRole) => {
+export const resolveRequestedRole = (user, requestedRole) => {
   const effectiveRoles = user.roles?.length ? user.roles : [user.role];
   const activeRole = requestedRole || "customer";
   if (!effectiveRoles.includes(activeRole)) return null;
   return { activeRole, effectiveRoles };
 };
 
-const ensureUserRoles = async (user) => {
+export const ensureUserRoles = async (user) => {
   const roles = Array.isArray(user.roles) ? [...user.roles] : [];
   const baseRole = user.role || "customer";
   if (!roles.includes(baseRole)) {
@@ -72,14 +72,14 @@ const ensureUserRoles = async (user) => {
 };
 
 /** Dashboard / SPA clients that cannot rely on cross-site httpOnly cookies. */
-const wantsDashboardTokens = (req) => {
+export const wantsDashboardTokens = (req) => {
   const h = req.headers["x-paridhan-client"];
   if (h && String(h).toLowerCase() === "dashboard") return true;
   if (process.env.DASHBOARD_RETURN_TOKENS === "true") return true;
   return false;
 };
 
-const createSessionAndTokens = async ({
+export const createSessionAndTokens = async ({
   user,
   activeRole,
   req,
@@ -209,6 +209,14 @@ export const loginCustomer = async (req, res) => {
       return res.status(200).json({
         success: false,
         message: "Account is disabled",
+        data: null
+      });
+    }
+
+    if (!user.password) {
+      return res.status(200).json({
+        success: false,
+        message: "This account uses Google sign-in. Please continue with Google.",
         data: null
       });
     }

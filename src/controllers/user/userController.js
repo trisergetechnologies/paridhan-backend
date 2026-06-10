@@ -75,7 +75,30 @@ export const updateMyProfile = async (req, res) => {
     }
 
     if (name) req.user.name = name;
-    if (phone) req.user.phone = phone;
+    if (phone) {
+      const digits = String(phone).replace(/\D/g, "");
+      const normalized =
+        digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+      if (!/^[6-9]\d{9}$/.test(normalized)) {
+        return res.status(200).json({
+          success: false,
+          message: "Enter a valid 10-digit Indian mobile number",
+          data: null,
+        });
+      }
+      const existing = await User.findOne({
+        phone: normalized,
+        _id: { $ne: req.user._id },
+      });
+      if (existing) {
+        return res.status(200).json({
+          success: false,
+          message: "This mobile number is already registered",
+          data: null,
+        });
+      }
+      req.user.phone = normalized;
+    }
     if (avatar) req.user.avatar = avatar;
 
     await req.user.save();

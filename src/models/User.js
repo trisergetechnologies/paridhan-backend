@@ -49,6 +49,19 @@ const userSchema = new mongoose.Schema(
       select: false,
     },
 
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true,
+    },
+
+    authProvider: {
+      type: String,
+      enum: ["local", "google"],
+      default: "local",
+    },
+
     // ================= BUSINESS ROLES =================
     role: {
       type: String,
@@ -128,6 +141,7 @@ userSchema.pre("validate", function () {
 
 // ================= PASSWORD MATCH =================
 userSchema.methods.matchPassword = async function (enteredPassword) {
+  if (!this.password) return false;
   return bcrypt.compare(enteredPassword, this.password);
 };
 

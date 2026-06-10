@@ -149,6 +149,14 @@ export function toPublicProductDetail(product) {
     description: product.description,
     fabric: product.fabric,
     color: product.color,
+    blouseIncluded: product.blouseIncluded !== false,
+    length: product.length || "5.5m",
+    discountPercentage:
+      product.discountPercentage != null
+        ? Number(product.discountPercentage)
+        : product.mrp && product.mrp > product.price
+          ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
+          : 0,
     variants,
   };
 }
