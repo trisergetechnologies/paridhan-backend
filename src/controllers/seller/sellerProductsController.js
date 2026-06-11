@@ -307,6 +307,22 @@ export const updateSellerProduct = async (req, res) => {
       }
       if (key === "price" || key === "mrp" || key === "stock") {
         product[key] = Number(req.body[key]);
+      } else if (
+        [
+          "fabric",
+          "color",
+          "length",
+          "occasion",
+          "pattern",
+          "fit",
+          "texture",
+          "washCare",
+          "ironing",
+          "storage",
+        ].includes(key)
+      ) {
+        const v = req.body[key];
+        product[key] = v == null || String(v).trim() === "" ? undefined : String(v).trim();
       } else {
         product[key] = req.body[key];
       }
