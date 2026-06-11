@@ -168,11 +168,49 @@ function buildHeroPipeline(baseMatch, postMatch, sort, limit) {
   ];
 }
 
+/** Shown when the catalog is empty (e.g. after seed:clean, before seller adds products). */
+function buildDefaultHeroSlides(placeholderImage, limit) {
+  const slides = [
+    {
+      id: "default-hero-1",
+      eyebrow: "Paridhan Emporium",
+      title: "Timeless sarees for every occasion",
+      subtitle:
+        "Handpicked silks, cottons, and festive weaves. Explore the collection or check back for new arrivals.",
+      image: placeholderImage,
+      cta: "Explore the shop",
+      href: "/shop",
+    },
+    {
+      id: "default-hero-2",
+      eyebrow: "Craft & elegance",
+      title: "Celebration-ready drapes",
+      subtitle: "From everyday cottons to statement silks — curated for every moment.",
+      image:
+        "https://images.unsplash.com/photo-1610030161231-d2f51196ca8c?auto=format&fit=crop&w=1920&q=80",
+      cta: "Shop now",
+      href: "/shop",
+    },
+    {
+      id: "default-hero-3",
+      eyebrow: "New season",
+      title: "Heritage weaves, modern grace",
+      subtitle: "Discover sarees crafted for comfort, colour, and lasting beauty.",
+      image:
+        "https://images.unsplash.com/photo-1583391734357-b188b2c36f9b?auto=format&fit=crop&w=1920&q=80",
+      cta: "View collection",
+      href: "/shop",
+    },
+  ];
+  return slides.slice(0, Math.min(Math.max(limit, 1), slides.length));
+}
+
 /**
  * GET /public/hero — carousel slides from the catalog.
  * 1) Featured products (isFeatured, active, not deleted).
  * 2) If none: latest in-stock products.
  * 3) If still none: latest products (any stock).
+ * 4) If catalog empty: branded default banners (until seller adds featured products).
  */
 export const getHeroSlides = async (req, res) => {
   try {
@@ -180,7 +218,7 @@ export const getHeroSlides = async (req, res) => {
     const sort = { createdAt: -1 };
     const placeholderImage =
       String(process.env.HERO_PLACEHOLDER_IMAGE_URL || "").trim() ||
-      "https://picsum.photos/seed/paridhan-hero/1920/1080";
+      "https://images.unsplash.com/photo-1610030161231-d2f51196ca8c?auto=format&fit=crop&w=1920&q=80";
 
     const featuredMatch = buildBaseMatch({ query: { featured: "true" } });
     let rawItems = await Product.aggregate(buildHeroPipeline(featuredMatch, {}, sort, limit));
@@ -210,7 +248,7 @@ export const getHeroSlides = async (req, res) => {
       latest: "Discover",
     };
 
-    const slides = rawItems.map((doc) => {
+    let slides = rawItems.map((doc) => {
       const item = toPublicProductList(doc);
       const img = (item.images?.[0]?.url || "").trim();
       return {
@@ -225,6 +263,11 @@ export const getHeroSlides = async (req, res) => {
         href: `/product/${item.slug}`,
       };
     });
+
+    if (!slides.length) {
+      slides = buildDefaultHeroSlides(placeholderImage, limit);
+      source = "default";
+    }
 
     return res.status(200).json({
       success: true,

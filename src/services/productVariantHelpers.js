@@ -151,6 +151,13 @@ export function toPublicProductDetail(product) {
     color: product.color,
     blouseIncluded: product.blouseIncluded !== false,
     length: product.length || "5.5m",
+    occasion: product.occasion,
+    pattern: product.pattern,
+    fit: product.fit,
+    texture: product.texture,
+    washCare: product.washCare,
+    ironing: product.ironing,
+    storage: product.storage,
     discountPercentage:
       product.discountPercentage != null
         ? Number(product.discountPercentage)

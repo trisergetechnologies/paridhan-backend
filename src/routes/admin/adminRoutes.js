@@ -20,6 +20,10 @@ import {
   updateSeller,
 } from "../../controllers/admin/adminSellersController.js";
 import { getAdminStorefrontMode, patchAdminStorefrontMode } from "../../controllers/admin/adminStorefrontController.js";
+import {
+  getAdminProductFieldOptions,
+  patchAdminProductFieldOptions,
+} from "../../controllers/admin/adminProductFieldOptionsController.js";
 import { postDeleteFile, postUploadAuth } from "../../controllers/imagekit/imagekitController.js";
 
 const router = express.Router();
@@ -28,6 +32,9 @@ router.use(protect, authorizeRoles("admin"));
 
 router.get("/site/storefront-mode", getAdminStorefrontMode);
 router.patch("/site/storefront-mode", patchAdminStorefrontMode);
+
+router.get("/product-field-options", getAdminProductFieldOptions);
+router.patch("/product-field-options", patchAdminProductFieldOptions);
 
 router.get("/stats", getAdminStats);
 

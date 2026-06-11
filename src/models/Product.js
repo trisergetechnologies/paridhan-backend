@@ -145,6 +145,14 @@ const productSchema = new mongoose.Schema(
       default: "5.5m",
     },
 
+    occasion: { type: String, trim: true },
+    pattern: { type: String, trim: true },
+    fit: { type: String, trim: true },
+    texture: { type: String, trim: true },
+    washCare: { type: String, trim: true },
+    ironing: { type: String, trim: true },
+    storage: { type: String, trim: true },
+
     // ================= MEDIA =================
     images: [
       {
