@@ -2,7 +2,9 @@ import { randomUUID } from "crypto";
 import mongoose from "mongoose";
 import Category from "../../models/Category.js";
 import Product from "../../models/Product.js";
+import { invalidateProductPublicCache } from "../../services/productPublicCacheService.js";
 import { deleteManyImageKitFiles } from "../../services/imagekitService.js";
+import { invalidateProductPublicCache } from "../../services/productPublicCacheService.js";
 import { parsePagination } from "../../utils/pagination.js";
 
 function normalizeVariantImage(img) {
@@ -234,6 +236,7 @@ export const createSellerProduct = async (req, res) => {
     });
 
     const fresh = await Product.findById(product._id).populate("categories", "name slug");
+    await invalidateProductPublicCache(fresh);
     return res.status(200).json({ success: true, message: "Product created", data: fresh });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });
@@ -251,6 +254,8 @@ export const updateSellerProduct = async (req, res) => {
     if (!product) {
       return res.status(200).json({ success: false, message: "Product not found", data: null });
     }
+
+    const previousSlug = product.slug;
 
     const allowed = [
       "name",
@@ -379,6 +384,7 @@ export const updateSellerProduct = async (req, res) => {
 
     await product.save();
     const fresh = await Product.findById(product._id).populate("categories", "name slug");
+    await invalidateProductPublicCache(fresh, { previousSlug });
     return res.status(200).json({ success: true, message: "Product updated", data: fresh });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message, data: null });
@@ -404,6 +410,7 @@ export const softDeleteSellerProduct = async (req, res) => {
     product.isDeleted = true;
     product.isActive = false;
     await product.save();
+    await invalidateProductPublicCache(product);
 
     return res.status(200).json({
       success: true,
