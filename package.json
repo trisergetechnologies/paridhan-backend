@@ -9,6 +9,8 @@
     "dev": "nodemon --config nodemon.json src/server.js",
     "seed": "node src/seed.js",
     "seed:destroy": "node src/seed.js --destroy",
+    "seed:clean": "node src/seed.clean-catalog.js",
+    "seed:client": "node src/seed.fresh.js",
     "seed:fresh": "node src/seed.fresh.js",
     "test": "node src/tests/role-cart-checkout.integration.js && node src/tests/dashboard-admin-seller.integration.js"
   },

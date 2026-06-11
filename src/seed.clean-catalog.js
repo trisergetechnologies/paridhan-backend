@@ -1,15 +1,9 @@
 /**
- * Client / production bootstrap — clean database with only:
- *   • 1 platform admin
- *   • 1 seller named "Paridhan Emporium"
+ * Client handoff prep — keeps categories & storefront settings.
+ * Removes products, orders, carts, all customers, and all old accounts.
+ * Creates one fresh admin + one seller "Paridhan Emporium".
  *
- * No demo products, categories, customers, carts, or orders.
- *
- *   npm run seed:client
- *   npm run seed:fresh   (alias)
- *
- * Dev dataset with 300 sample products: npm run seed
- * Wipe only: npm run seed:destroy
+ *   npm run seed:clean
  */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
@@ -17,7 +11,6 @@ import mongoose from "mongoose";
 import AuthSession from "./models/AuthSession.js";
 import Cart from "./models/Cart.js";
 import Category from "./models/Category.js";
-import ContactMessage from "./models/ContactMessage.js";
 import Order from "./models/Order.js";
 import Product from "./models/Product.js";
 import StorefrontSettings from "./models/StorefrontSettings.js";
@@ -35,24 +28,24 @@ const connectDB = async () => {
   await mongoose.connect(process.env.MONGO_URI);
 };
 
-const wipeAll = async () => {
-  await Promise.all([
-    User.deleteMany(),
-    Category.deleteMany(),
-    Product.deleteMany(),
-    Cart.deleteMany(),
-    Order.deleteMany(),
-    AuthSession.deleteMany(),
-    StorefrontSettings.deleteMany(),
-    ContactMessage.deleteMany(),
-  ]);
-};
-
-const seedClient = async () => {
+const cleanForClient = async () => {
   try {
     await connectDB();
-    await wipeAll();
-    console.log("Database wiped.");
+
+    const [productResult, orderResult, cartResult, userResult, sessionResult, categoryCount] =
+      await Promise.all([
+        Product.deleteMany({}),
+        Order.deleteMany({}),
+        Cart.deleteMany({}),
+        User.deleteMany({}),
+        AuthSession.deleteMany({}),
+        Category.countDocuments(),
+      ]);
+
+    let settings = await StorefrontSettings.findOne();
+    if (!settings) {
+      settings = await StorefrontSettings.create({ mode: "live" });
+    }
 
     const admin = await User.create({
       name: SEED_ADMIN_NAME,
@@ -70,31 +63,31 @@ const seedClient = async () => {
       roles: ["seller"],
     });
 
-    await StorefrontSettings.create({ mode: "live" });
-
     console.log("");
-    console.log("✅ Client bootstrap complete — admin + Paridhan Emporium seller only.");
+    console.log("✅ Client prep complete.");
+    console.log("");
+    console.log("Removed:");
+    console.log(`  Products:  ${productResult.deletedCount}`);
+    console.log(`  Orders:    ${orderResult.deletedCount}`);
+    console.log(`  Carts:     ${cartResult.deletedCount}`);
+    console.log(`  Users:     ${userResult.deletedCount} (all customers + old accounts)`);
+    console.log(`  Sessions:  ${sessionResult.deletedCount}`);
+    console.log("");
+    console.log("Kept:");
+    console.log(`  Categories:      ${categoryCount}`);
+    console.log(`  Storefront mode: ${settings.mode}`);
     console.log("");
     if (DEFAULT_PASSWORD === "123456" && !process.env.SEED_PASSWORD) {
       console.log("⚠️  Using default password 123456 — set SEED_PASSWORD before production.");
       console.log("");
     }
-    console.log("═══ Dashboard — Platform admin ═══");
-    console.log("  URL:      https://admin.paridhanemporium.com/auth");
-    console.log("  Role:     Platform admin");
+    console.log("═══ Platform admin ═══");
     console.log(`  Email:    ${admin.email}`);
     console.log(`  Password: ${DEFAULT_PASSWORD}`);
     console.log("");
-    console.log("═══ Dashboard — Seller ═══");
-    console.log("  Role:     Seller");
-    console.log(`  Name:     ${seller.name}`);
+    console.log("═══ Seller — Paridhan Emporium ═══");
     console.log(`  Email:    ${seller.email}`);
     console.log(`  Password: ${DEFAULT_PASSWORD}`);
-    console.log("");
-    console.log("Next steps for the client:");
-    console.log("  1. Sign in as admin → create categories");
-    console.log("  2. Sign in as seller → add products");
-    console.log("  3. Customers register on the storefront");
     console.log("");
     process.exit(0);
   } catch (error) {
@@ -103,4 +96,4 @@ const seedClient = async () => {
   }
 };
 
-seedClient();
+cleanForClient();

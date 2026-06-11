@@ -1,3 +1,7 @@
+/**
+ * DEV-ONLY full dataset (300 products, 2 sellers, test customer, orders).
+ * For client handoff use: npm run seed:client
+ */
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 
