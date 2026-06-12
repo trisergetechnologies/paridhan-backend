@@ -1,9 +1,14 @@
 import mongoose from "mongoose";
 import {
   DEFAULT_PRODUCT_FIELD_OPTIONS,
+  normalizeOptionList,
   normalizeOptionsObject,
   PRODUCT_FIELD_KEYS,
 } from "../config/productFieldOptionsDefaults.js";
+
+function isUninitializedOptions(stored) {
+  return PRODUCT_FIELD_KEYS.every((key) => !Array.isArray(stored?.[key]) || stored[key].length === 0);
+}
 
 const optionArrays = Object.fromEntries(
   PRODUCT_FIELD_KEYS.map((key) => [key, { type: [String], default: [] }]),
@@ -24,7 +29,14 @@ export async function getProductFieldOptionsDoc() {
     doc = await ProductFieldOptions.create({
       options: normalizeOptionsObject(DEFAULT_PRODUCT_FIELD_OPTIONS),
     });
+    return doc;
   }
+
+  if (isUninitializedOptions(doc.options)) {
+    doc.options = normalizeOptionsObject(DEFAULT_PRODUCT_FIELD_OPTIONS);
+    await doc.save();
+  }
+
   return doc;
 }
 
