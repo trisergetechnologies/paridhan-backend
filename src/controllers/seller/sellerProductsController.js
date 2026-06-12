@@ -4,7 +4,6 @@ import Category from "../../models/Category.js";
 import Product from "../../models/Product.js";
 import { invalidateProductPublicCache } from "../../services/productPublicCacheService.js";
 import { deleteManyImageKitFiles } from "../../services/imagekitService.js";
-import { invalidateProductPublicCache } from "../../services/productPublicCacheService.js";
 import { parsePagination } from "../../utils/pagination.js";
 
 function normalizeVariantImage(img) {
