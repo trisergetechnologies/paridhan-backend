@@ -6,9 +6,9 @@ import { cashfreeWebhook } from "../../controllers/payments/paymentController.js
 import { lookupPincode } from "../../controllers/public/pincodeController.js";
 import {
   getAllProducts,
-  getHeroSlides,
   getSingleProduct,
 } from "../../controllers/products/productController.js";
+import { getHeroSlides } from "../../controllers/public/heroController.js";
 
 const router = express.Router();
 

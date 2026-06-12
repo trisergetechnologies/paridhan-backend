@@ -1,4 +1,18 @@
 import mongoose from "mongoose";
+import { DEFAULT_HERO_BANNER } from "../config/heroBannerDefaults.js";
+
+const heroBannerSchema = new mongoose.Schema(
+  {
+    image: { type: String, default: "" },
+    imageFileId: { type: String, default: "" },
+    eyebrow: { type: String, default: DEFAULT_HERO_BANNER.eyebrow },
+    title: { type: String, default: DEFAULT_HERO_BANNER.title },
+    subtitle: { type: String, default: DEFAULT_HERO_BANNER.subtitle },
+    cta: { type: String, default: DEFAULT_HERO_BANNER.cta },
+    href: { type: String, default: DEFAULT_HERO_BANNER.href },
+  },
+  { _id: false },
+);
 
 const storefrontSettingsSchema = new mongoose.Schema(
   {
@@ -6,6 +20,10 @@ const storefrontSettingsSchema = new mongoose.Schema(
       type: String,
       enum: ["live", "maintenance", "coming_soon"],
       default: "live",
+    },
+    hero: {
+      type: heroBannerSchema,
+      default: () => ({ ...DEFAULT_HERO_BANNER }),
     },
   },
   { timestamps: true },

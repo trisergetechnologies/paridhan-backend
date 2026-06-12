@@ -19,7 +19,7 @@ import {
   softDeleteSeller,
   updateSeller,
 } from "../../controllers/admin/adminSellersController.js";
-import { getAdminStorefrontMode, patchAdminStorefrontMode } from "../../controllers/admin/adminStorefrontController.js";
+import { getAdminStorefrontMode, patchAdminStorefrontMode, getAdminHeroBanner, patchAdminHeroBanner } from "../../controllers/admin/adminStorefrontController.js";
 import {
   getAdminProductFieldOptions,
   patchAdminProductFieldOptions,
@@ -32,6 +32,8 @@ router.use(protect, authorizeRoles("admin"));
 
 router.get("/site/storefront-mode", getAdminStorefrontMode);
 router.patch("/site/storefront-mode", patchAdminStorefrontMode);
+router.get("/site/hero-banner", getAdminHeroBanner);
+router.patch("/site/hero-banner", patchAdminHeroBanner);
 
 router.get("/product-field-options", getAdminProductFieldOptions);
 router.patch("/product-field-options", patchAdminProductFieldOptions);
