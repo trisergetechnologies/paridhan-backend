@@ -1,13 +1,13 @@
 import mongoose from "mongoose";
-import ReturnRequest from "../models/ReturnRequest.js";
-import Order from "../models/Order.js";
-import User from "../models/User.js";
-import { parsePagination } from "../utils/pagination.js";
+import ReturnRequest from "../../models/ReturnRequest.js";
+import Order from "../../models/Order.js";
+import User from "../../models/User.js";
+import { parsePagination } from "../../utils/pagination.js";
 import {
   tryCreateShiprocketReturn,
   setManualReturnShipping,
-} from "../services/orderShippingService.js";
-import { getReturnEligibility } from "../utils/returnEligibility.js";
+} from "../../services/orderShippingService.js";
+import { getReturnEligibility } from "../../utils/returnEligibility.js";
 
 const RETURN_STATUS_TRANSITIONS = {
   requested: new Set(["approved", "rejected"]),
