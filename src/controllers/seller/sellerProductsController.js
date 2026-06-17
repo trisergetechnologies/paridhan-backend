@@ -285,6 +285,7 @@ export const updateSellerProduct = async (req, res) => {
 
     for (const key of allowed) {
       if (req.body[key] === undefined) continue;
+      if (key === "shippingUseDefault" || key === "shippingCharge") continue;
       if (key === "discountPercentage" || key === "gstPercent") {
         const v = req.body[key];
         product[key] = v === null || v === "" ? undefined : Number(v);
@@ -292,21 +293,6 @@ export const updateSellerProduct = async (req, res) => {
       }
       if (key === "hsnCode") {
         product.hsnCode = req.body.hsnCode ? String(req.body.hsnCode).trim() : undefined;
-        continue;
-      }
-      if (key === "shippingUseDefault") {
-        product.shippingUseDefault = req.body.shippingUseDefault !== false;
-        if (product.shippingUseDefault) {
-          product.shippingCharge = undefined;
-        }
-        continue;
-      }
-      if (key === "shippingCharge") {
-        if (product.shippingUseDefault === false) {
-          const v = req.body.shippingCharge;
-          product.shippingCharge =
-            v === null || v === "" ? undefined : Math.max(0, Number(v));
-        }
         continue;
       }
       if (key === "price" || key === "mrp" || key === "stock") {
@@ -329,6 +315,19 @@ export const updateSellerProduct = async (req, res) => {
         product[key] = v == null || String(v).trim() === "" ? undefined : String(v).trim();
       } else {
         product[key] = req.body[key];
+      }
+    }
+
+    if (req.body.shippingUseDefault !== undefined || req.body.shippingCharge !== undefined) {
+      const useDefault =
+        req.body.shippingUseDefault !== undefined
+          ? req.body.shippingUseDefault !== false
+          : product.shippingUseDefault !== false;
+      product.shippingUseDefault = useDefault;
+      if (useDefault) {
+        product.shippingCharge = undefined;
+      } else if (req.body.shippingCharge != null && req.body.shippingCharge !== "") {
+        product.shippingCharge = Math.max(0, Number(req.body.shippingCharge));
       }
     }
 

@@ -42,11 +42,10 @@ function sameCartLine(a, b) {
 }
 
 function applyProductShippingToItem(item, product) {
+  // Always use the product's current shipping settings (cart snapshots can be stale).
   const resolved = resolveLineShipping({
-    shippingUseDefault: item.shippingUseDefault,
-    shippingCharge: item.shippingCharge,
-    subtotal: item.subtotal,
     product,
+    subtotal: item.subtotal,
   });
   item.shippingUseDefault = resolved.shippingUseDefault;
   if (!resolved.shippingUseDefault) {
@@ -229,6 +228,7 @@ export const addToCart = async (req, res) => {
         cart.items[itemIndex].subtotal =
           cart.items[itemIndex].price * cart.items[itemIndex].quantity;
       }
+      applyProductShippingToItem(cart.items[itemIndex], product);
     } else {
       if (isSet) {
         return res.status(200).json({
