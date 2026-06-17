@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Cart from "../../models/Cart.js";
 import Order from "../../models/Order.js";
+import ReturnRequest from "../../models/ReturnRequest.js";
 import User from "../../models/User.js";
 import {
   createCashfreePaymentSession,
@@ -8,6 +9,11 @@ import {
 } from "../../services/cashfreeService.js";
 import { discardDraftOrder } from "../../services/orderFulfillmentService.js";
 import { calculateCartTotals, lineTaxForSubtotal } from "../../services/pricingService.js";
+import {
+  cancelCustomerOrder,
+  getOrderCancelEligibility,
+} from "../../services/orderCancellationService.js";
+import { getReturnEligibility } from "../../utils/returnEligibility.js";
 
 function buildReturnUrl(orderMongoId) {
   const base =
@@ -322,5 +328,68 @@ export const getOrderById = async (req, res) => {
       message: error.message,
       data: null
     });
+  }
+};
+
+export const cancelOrder = async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    if (!mongoose.isValidObjectId(orderId)) {
+      return res.status(200).json({ success: false, message: "Invalid order id", data: null });
+    }
+
+    const order = await Order.findOne({ _id: orderId, user: req.user._id });
+    if (!order) {
+      return res.status(200).json({ success: false, message: "Order not found", data: null });
+    }
+
+    const { reason } = req.body || {};
+
+    try {
+      const updated = await cancelCustomerOrder(order, {
+        reason,
+        userId: req.user._id,
+      });
+      return res.status(200).json({
+        success: true,
+        message:
+          updated.paymentStatus === "refund_pending"
+            ? "Order cancelled. Your refund will be processed within 5–7 business days."
+            : "Order cancelled successfully.",
+        data: updated,
+      });
+    } catch (err) {
+      return res.status(200).json({
+        success: false,
+        message: err.message || "Could not cancel order",
+        data: null,
+      });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message, data: null });
+  }
+};
+
+export const getOrderCancelStatus = async (req, res) => {
+  try {
+    const order = await Order.findOne({ _id: req.params.id, user: req.user._id }).lean();
+    if (!order) {
+      return res.status(200).json({ success: false, message: "Order not found", data: null });
+    }
+
+    const cancelEligibility = getOrderCancelEligibility(order);
+    const existingReturns = await ReturnRequest.find({ order: order._id }).lean();
+    const returnEligibility = getReturnEligibility(order, existingReturns);
+
+    return res.status(200).json({
+      success: true,
+      message: "Eligibility fetched",
+      data: {
+        cancel: cancelEligibility,
+        return: returnEligibility,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message, data: null });
   }
 };

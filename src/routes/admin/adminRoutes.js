@@ -9,7 +9,7 @@ import {
   updateCategory,
 } from "../../controllers/admin/adminCategoriesController.js";
 import { getCustomer, listCustomers } from "../../controllers/admin/adminCustomersController.js";
-import { getOrder, listOrders, patchOrder } from "../../controllers/admin/adminOrdersController.js";
+import { getOrder, listOrders, patchOrder, createShipment, patchOrderShipping, markOrderRefundedHandler } from "../../controllers/admin/adminOrdersController.js";
 import { getAdminStats } from "../../controllers/admin/adminStatsController.js";
 import {
   createSeller,
@@ -25,6 +25,13 @@ import {
   patchAdminProductFieldOptions,
 } from "../../controllers/admin/adminProductFieldOptionsController.js";
 import { postDeleteFile, postUploadAuth } from "../../controllers/imagekit/imagekitController.js";
+import {
+  adminListReturns,
+  adminGetReturn,
+  adminPatchReturn,
+  adminScheduleReturnPickup,
+  adminMarkReturnRefunded,
+} from "../../controllers/returns/returnController.js";
 
 const router = express.Router();
 
@@ -62,5 +69,14 @@ router.get("/customers/:id", getCustomer);
 router.get("/orders", listOrders);
 router.get("/orders/:id", getOrder);
 router.patch("/orders/:id", patchOrder);
+router.post("/orders/:id/create-shipment", createShipment);
+router.patch("/orders/:id/shipping", patchOrderShipping);
+router.patch("/orders/:id/mark-refunded", markOrderRefundedHandler);
+
+router.get("/returns", adminListReturns);
+router.get("/returns/:id", adminGetReturn);
+router.patch("/returns/:id", adminPatchReturn);
+router.post("/returns/:id/schedule-pickup", adminScheduleReturnPickup);
+router.patch("/returns/:id/mark-refunded", adminMarkReturnRefunded);
 
 export default router;

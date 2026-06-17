@@ -3,6 +3,7 @@ import { listPublicCategories } from "../../controllers/public/categoryControlle
 import { submitContactMessage } from "../../controllers/public/contactController.js";
 import { getPublicStorefrontMode } from "../../controllers/public/storefrontController.js";
 import { cashfreeWebhook } from "../../controllers/payments/paymentController.js";
+import { shiprocketWebhook } from "../../controllers/shipping/shiprocketWebhookController.js";
 import { lookupPincode } from "../../controllers/public/pincodeController.js";
 import {
   getAllProducts,
@@ -21,6 +22,7 @@ router.get("/products", getAllProducts);
 router.get("/products/single/:slug", getSingleProduct);
 
 router.post("/payments/cashfree/webhook", cashfreeWebhook);
+router.post("/shiprocket/webhook", shiprocketWebhook);
 router.get("/pincode/:pin", lookupPincode);
 
 export default router;

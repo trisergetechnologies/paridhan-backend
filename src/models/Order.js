@@ -88,6 +88,37 @@ const addressSnapshotSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const shippingSchema = new mongoose.Schema(
+  {
+    mode: {
+      type: String,
+      enum: ["shiprocket", "manual"],
+      default: "manual"
+    },
+    shiprocketOrderId: String,
+    shipmentId: Number,
+    awb: String,
+    courierName: String,
+    trackingUrl: String,
+    shiprocketError: String
+  },
+  { _id: false }
+);
+
+const refundSchema = new mongoose.Schema(
+  {
+    amount: Number,
+    refundPendingAt: Date,
+    refundedAt: Date,
+    refundedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
+    },
+    referenceNote: String
+  },
+  { _id: false }
+);
+
 const orderSchema = new mongoose.Schema(
   {
     // ================= CORE =================
@@ -144,7 +175,7 @@ const orderSchema = new mongoose.Schema(
 
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "failed"],
+      enum: ["pending", "paid", "failed", "refund_pending", "refunded"],
       default: "pending"
     },
 
@@ -179,7 +210,15 @@ const orderSchema = new mongoose.Schema(
         "cancelled"
       ],
       default: "placed"
-    }
+    },
+
+    shippedAt: Date,
+    deliveredAt: Date,
+    cancelledAt: Date,
+    cancelReason: String,
+
+    shipping: shippingSchema,
+    refund: refundSchema
   },
   {
     timestamps: true
