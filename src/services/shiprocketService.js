@@ -70,7 +70,12 @@ export async function getAuthToken() {
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.token) {
-    throw Object.assign(new Error(json.message || "Shiprocket authentication failed"), {
+    cachedToken = null;
+    tokenExpiresAt = 0;
+    const msg =
+      json.message ||
+      "Shiprocket authentication failed. Use API user email/password from Settings → API Users.";
+    throw Object.assign(new Error(msg), {
       code: "SHIPROCKET_AUTH_FAILED",
     });
   }
